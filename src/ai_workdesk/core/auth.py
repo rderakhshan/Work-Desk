@@ -6,7 +6,6 @@ for various AI services while following best practices.
 """
 
 import os
-from typing import Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -24,7 +23,7 @@ class AuthenticationManager:
         """Initialize the authentication manager."""
         self.settings = get_settings()
 
-    def get_openai_api_key(self) -> Optional[str]:
+    def get_openai_api_key(self) -> str | None:
         """
         Get OpenAI API key from settings or environment.
 
@@ -33,7 +32,7 @@ class AuthenticationManager:
         """
         return self.settings.openai_api_key or os.getenv("OPENAI_API_KEY")
 
-    def get_anthropic_api_key(self) -> Optional[str]:
+    def get_anthropic_api_key(self) -> str | None:
         """
         Get Anthropic API key from settings or environment.
 
@@ -42,7 +41,7 @@ class AuthenticationManager:
         """
         return self.settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
 
-    def get_google_api_key(self) -> Optional[str]:
+    def get_google_api_key(self) -> str | None:
         """
         Get Google AI API key from settings or environment.
 
@@ -51,7 +50,7 @@ class AuthenticationManager:
         """
         return self.settings.google_api_key or os.getenv("GOOGLE_API_KEY")
 
-    def get_cohere_api_key(self) -> Optional[str]:
+    def get_cohere_api_key(self) -> str | None:
         """
         Get Cohere API key from settings or environment.
 
@@ -162,15 +161,14 @@ class AuthenticationManager:
 
         if service_lower not in validators:
             raise ValueError(
-                f"Unknown service: {service}. "
-                f"Available services: {', '.join(validators.keys())}"
+                f"Unknown service: {service}. Available services: {', '.join(validators.keys())}"
             )
 
         return validators[service_lower]() is not None
 
 
 # Global authentication manager instance
-_auth_manager: Optional[AuthenticationManager] = None
+_auth_manager: AuthenticationManager | None = None
 
 
 def get_auth_manager() -> AuthenticationManager:

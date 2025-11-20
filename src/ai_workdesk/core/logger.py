@@ -7,7 +7,6 @@ custom formatting and handlers.
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 
@@ -15,7 +14,7 @@ from .config import get_settings
 
 
 def setup_logger(
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     log_level: str = "INFO",
     rotation: str = "10 MB",
     retention: str = "1 week",
@@ -59,12 +58,7 @@ def setup_logger(
     # File handler with rotation
     logger.add(
         log_file,
-        format=(
-            "{time:YYYY-MM-DD HH:mm:ss} | "
-            "{level: <8} | "
-            "{name}:{function}:{line} | "
-            "{message}"
-        ),
+        format=("{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}"),
         level=log_level,
         rotation=rotation,
         retention=retention,

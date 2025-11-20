@@ -7,9 +7,10 @@ with the AI Workdesk configuration management.
 Run with: uv run python examples/simple_openai_chat.py
 """
 
-from ai_workdesk import get_settings, get_logger
 from rich.console import Console
 from rich.panel import Panel
+
+from ai_workdesk import get_logger, get_settings
 
 console = Console()
 logger = get_logger(__name__)

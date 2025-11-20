@@ -2,10 +2,7 @@
 Test configuration module.
 """
 
-import os
 from pathlib import Path
-
-import pytest
 
 from ai_workdesk.core.config import Settings, get_settings
 

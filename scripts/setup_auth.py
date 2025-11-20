@@ -94,9 +94,7 @@ def test_apis(auth_manager) -> None:
         except Exception as e:
             console.print(f"[red]❌ Error: {e}[/red]")
 
-    console.print(
-        "\n[dim]Note: Full API testing requires installing optional dependencies:[/dim]"
-    )
+    console.print("\n[dim]Note: Full API testing requires installing optional dependencies:[/dim]")
     console.print("[dim]  uv sync --extra llm[/dim]\n")
 
 

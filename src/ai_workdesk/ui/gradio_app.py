@@ -11,9 +11,6 @@ A beautiful, secure web interface for your AI Workdesk with:
 Run with: uv run ai-workdesk-ui
 """
 
-import os
-from datetime import datetime
-from typing import Optional
 
 import gradio as gr
 from openai import OpenAI
@@ -36,7 +33,7 @@ class AIWorkdeskUI:
         """Initialize the UI."""
         self.settings = get_settings()
         self.auth_manager = get_auth_manager()
-        self.openai_client: Optional[OpenAI] = None
+        self.openai_client: OpenAI | None = None
 
         # Initialize OpenAI if configured
         if self.auth_manager.validate_service("openai"):
@@ -88,7 +85,7 @@ class AIWorkdeskUI:
 
         Args:
             message: User message
-            history: Chat history  
+            history: Chat history
             model: Model name
             temperature: Temperature setting
             max_tokens: Maximum tokens
@@ -158,7 +155,7 @@ class AIWorkdeskUI:
             font-family: 'Inter', sans-serif;
             max-width: 95% !important;
         }
-        
+
         /* Sidebar Styling */
         .sidebar-nav {
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
@@ -166,17 +163,17 @@ class AIWorkdeskUI:
             padding: 10px;
             margin-bottom: 10px;
         }
-        
+
         .nav-button {
             width: 100%;
             margin: 5px 0;
             transition: all 0.3s ease;
         }
-        
+
         .nav-button:hover {
             transform: translateX(5px);
         }
-        
+
         /* Page Content Styling */
         .header-title {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -187,26 +184,26 @@ class AIWorkdeskUI:
             text-align: center;
             margin: 20px 0;
         }
-        
+
         .status-box {
             background: rgba(102, 126, 234, 0.1);
             border-radius: 10px;
             padding: 15px;
             border-left: 4px solid #667eea;
         }
-        
+
         .chat-container {
             border-radius: 15px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
             height: 70vh !important;
             min-height: 500px;
         }
-        
+
         /* Hide Gradio footer */
         footer {
             display: none !important;
         }
-        
+
         /* Smooth transitions for page changes */
         .transition-fade {
             transition: opacity 0.3s ease-in-out;
@@ -378,7 +375,9 @@ class AIWorkdeskUI:
                         )
 
                         with gr.Row():
-                            refresh_status_btn = gr.Button("🔄 Refresh Status", variant="secondary", scale=1)
+                            refresh_status_btn = gr.Button(
+                                "🔄 Refresh Status", variant="secondary", scale=1
+                            )
 
                         refresh_status_btn.click(
                             lambda: self.get_auth_status(),
@@ -390,7 +389,9 @@ class AIWorkdeskUI:
 
                         # Quick Actions
                         gr.Markdown("## 🚀 Quick Actions")
-                        gr.Markdown("Ready to start working with AI? Head to the Work Desk to begin chatting!")
+                        gr.Markdown(
+                            "Ready to start working with AI? Head to the Work Desk to begin chatting!"
+                        )
 
                     # Work Desk Page
                     with gr.Column(visible=False) as workdesk_page:
@@ -415,20 +416,22 @@ class AIWorkdeskUI:
                                     send_btn = gr.Button("Send 📤", scale=1, variant="primary")
 
                                 with gr.Row():
-                                    clear_btn = gr.Button("🗑️ Clear Chat", variant="secondary", scale=1)
+                                    clear_btn = gr.Button(
+                                        "🗑️ Clear Chat", variant="secondary", scale=1
+                                    )
 
                             with gr.Column(scale=1):
                                 model_dropdown = gr.Dropdown(
                                     choices=[
-                                        "gpt-4o", 
-                                        "gpt-4o-mini", 
-                                        "gpt-4-turbo", 
-                                        "gpt-4", 
-                                        "gpt-3.5-turbo"
+                                        "gpt-4o",
+                                        "gpt-4o-mini",
+                                        "gpt-4-turbo",
+                                        "gpt-4",
+                                        "gpt-3.5-turbo",
                                     ],
                                     value=self.settings.default_llm_model,
                                     label="Model",
-                                    allow_custom_value=True  # Allow custom model names
+                                    allow_custom_value=True,  # Allow custom model names
                                 )
 
                                 temperature_slider = gr.Slider(
@@ -442,7 +445,9 @@ class AIWorkdeskUI:
                                 max_tokens_slider = gr.Slider(
                                     minimum=100,
                                     maximum=8192,  # Increased to support larger token limits
-                                    value=min(self.settings.max_tokens, 8192),  # Ensure value is within range
+                                    value=min(
+                                        self.settings.max_tokens, 8192
+                                    ),  # Ensure value is within range
                                     step=100,
                                     label="Max Tokens",
                                 )
@@ -518,26 +523,26 @@ class AIWorkdeskUI:
                         gr.Markdown(
                             """
                             ## Version 0.1.0
-                            
+
                             ### Supported Services
                             - OpenAI (GPT-4, GPT-3.5)
                             - Anthropic (Claude) - Coming Soon
                             - Google AI - Coming Soon
-                            
+
                             ### Tech Stack
                             - **Framework**: Gradio 5.0
                             - **Backend**: Python with UV package manager
                             - **AI Services**: OpenAI, LangChain
                             - **Authentication**: Secure user sessions
-                            
+
                             ### Quick Tips
                             1. Adjust temperature for creativity (0 = focused, 2 = creative)
                             2. Use higher max tokens for longer responses
                             3. Check Home page for API configuration status
                             4. Clear chat history for a fresh start
-                            
+
                             ---
-                            
+
                             **Made with ❤️ using AI Workdesk**
                             """
                         )
@@ -545,7 +550,7 @@ class AIWorkdeskUI:
                         # Configuration Table
                         gr.Markdown("## 🔧 Current Configuration")
 
-                        config_info = gr.DataFrame(
+                        gr.DataFrame(
                             value=[
                                 ["Default Model", self.settings.default_llm_model],
                                 ["Temperature", str(self.settings.default_temperature)],

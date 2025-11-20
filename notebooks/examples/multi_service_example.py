@@ -7,9 +7,9 @@ This example shows how to work with multiple AI providers
 Run with: uv run python examples/multi_service_example.py
 """
 
-from ai_workdesk import get_settings, get_auth_manager, get_logger
 from rich.console import Console
-from rich.panel import Panel
+
+from ai_workdesk import get_auth_manager, get_logger, get_settings
 
 console = Console()
 logger = get_logger(__name__)
