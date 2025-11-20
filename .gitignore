@@ -1,18 +1,25 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.pyc
+*.pyo
+*.pyd
+.Python
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
 *.egg
 .eggs/
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Virtual environments
 .venv
 venv/
 ENV/
 env/
+python_env/
 
 # IDE
 .vscode/
@@ -21,19 +28,49 @@ env/
 *.swo
 *~
 .DS_Store
+*.sublime-*
 
-# Environment variables and secrets
+# Environment variables and secrets - CRITICAL SECTION
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
+.env.test
+*.env
+!.env.example
+config/secrets.yaml
+config/credentials.yaml
 *.secrets.yaml
 credentials.toml
+secrets.toml
+config.toml
+settings.toml
+keys.json
+service-account-*.json
+*.key
+*.pem
+*.crt
+*.cert
+id_rsa
+id_dsa
+*.p12
+*.pfx
+
+# API Keys and sensitive files
+api_keys.py
+secrets.py
+credentials.py
+config.py
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
+.nox/
+.cache
+nosetests.xml
 
 # MyPy
 .mypy_cache/
@@ -43,6 +80,7 @@ dmypy.json
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+.ipython
 
 # Data
 data/raw/*
@@ -55,10 +93,34 @@ data/outputs/*
 # Logs
 logs/
 *.log
+logfile*
 
 # OS
 Thumbs.db
 .DS_Store
+Desktop.ini
 
 # UV-specific
 uv.lock
+
+# Project specific
+instance/
+.webassets-cache
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+[Tt]humbs.db
+ehthumbs.db
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
