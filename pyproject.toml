@@ -1,0 +1,136 @@
+[project]
+name = "ai-workdesk"
+version = "0.1.0"
+description = "A professional workdesk for developing and utilizing AI tools"
+readme = "README.md"
+authors = [
+    { name = "rderakhshan", email = "riemann.derakhshan@gmail.com" }
+]
+requires-python = ">=3.12"
+keywords = ["ai", "ml", "tools", "llm", "rag", "workdesk"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Core dependencies
+dependencies = [
+    "python-dotenv>=1.0.0", # Environment variable management
+    "pydantic>=2.0.0", # Data validation
+    "pydantic-settings>=2.0.0", # Settings management
+    "rich>=13.0.0", # Beautiful terminal output
+    "loguru>=0.7.0", # Advanced logging
+    "httpx>=0.27.0", # Modern HTTP client
+    "tenacity>=8.0.0", # Retry logic
+    "gradio>=5.0.0",
+]
+
+# Optional dependency groups for different AI tools
+[project.optional-dependencies]
+# LLM tools
+llm = [
+    "openai>=1.0.0",
+    "anthropic>=0.40.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.3.0",
+    "tiktoken>=0.8.0",
+]
+
+# Embeddings and vector stores
+embeddings = [
+    "sentence-transformers>=2.2.0",
+    "chromadb>=0.4.0",
+    "faiss-cpu>=1.7.0",
+]
+
+# Vision tools
+vision = [
+    "pillow>=10.0.0",
+    "opencv-python>=4.8.0",
+]
+
+# All AI tools
+all = [
+    "ai-workdesk[llm,embeddings,vision]",
+]
+
+# Development tools
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.8.0",
+    "mypy>=1.8.0",
+    "ipython>=8.12.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.29.0",
+]
+
+[project.scripts]
+ai-workdesk = "ai_workdesk:main"
+ai-workdesk-ui = "ai_workdesk.ui.gradio_app:main"
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+# UV-specific configuration
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.8.0",
+    "mypy>=1.8.0",
+    "ipython>=8.12.0",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.29.0",
+]
+
+# Ruff configuration
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=ai_workdesk",
+    "--cov-report=term-missing",
+]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
