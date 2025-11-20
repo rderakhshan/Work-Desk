@@ -46,7 +46,7 @@ ai-workdesk/
 
 1. **Clone or navigate to the project directory:**
 ```bash
-cd "c:\Users\Riemann\Documents\AI Engineering LAB\RAG\RAG LAB"
+cd "C:\\RAG LAB"
 ```
 
 2. **Sync dependencies:**
