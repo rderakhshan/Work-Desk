@@ -13,6 +13,7 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🎨 **Beautiful Console**: Rich terminal output with loguru logging
 - 🖥️ **Modern UI**: Gradio-based web interface with glassmorphism design
 - 🔍 **Advanced RAG**: Support for Naive, Hybrid, Contextual, and Graph RAG
+- ⚙️ **Granular Control**: Advanced settings for Top-K, Chunk Size, Overlap, and Reranking
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
 
 ## 📁 Project Structure
@@ -225,6 +226,7 @@ See `.env.example` for all available options:
 - **LLM API Keys**: OpenAI, Anthropic, Google, Cohere
 - **Model Settings**: Default models, temperature, max tokens
 - **Application Settings**: Environment, log level, paths
+- **Advanced RAG**: Top-K retrieval, chunk size/overlap, reranking enablement
 - **Vector Store**: ChromaDB configuration
 - **Security**: Rate limiting, timeouts, retries
 

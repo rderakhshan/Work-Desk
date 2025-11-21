@@ -87,6 +87,13 @@ class AIWorkdeskUI:
         database_type: str,
         temperature: float,
         max_tokens: int,
+        # Advanced Settings
+        top_k: int,
+        similarity_threshold: float,
+        chunk_size: int,
+        chunk_overlap: int,
+        use_reranker: bool,
+        system_prompt: str,
     ) -> tuple:
         """
         Chat with AI service.
@@ -100,6 +107,12 @@ class AIWorkdeskUI:
             database_type: Database type to use
             temperature: Temperature setting
             max_tokens: Maximum tokens
+            top_k: Number of chunks to retrieve
+            similarity_threshold: Minimum similarity score
+            chunk_size: Size of chunks in tokens
+            chunk_overlap: Overlap between chunks
+            use_reranker: Whether to use reranking
+            system_prompt: Custom system prompt
 
         Returns:
             Tuple of (updated history, empty string for input)
@@ -116,12 +129,19 @@ class AIWorkdeskUI:
 
         logger.info(
             f"Processing chat with model: {model}, technique: {rag_technique}, "
-            f"embedding: {embedding_model}, db: {database_type}, temp: {temperature}"
+            f"embedding: {embedding_model}, db: {database_type}, temp: {temperature}\n"
+            f"Advanced: top_k={top_k}, thresh={similarity_threshold}, "
+            f"chunk={chunk_size}, overlap={chunk_overlap}, rerank={use_reranker}"
         )
 
         try:
             # Prepare messages from history
             messages = []
+            
+            # Add system prompt if provided
+            if system_prompt.strip():
+                messages.append({"role": "system", "content": system_prompt})
+            
             for msg in history:
                 if isinstance(msg, dict) and "role" in msg and "content" in msg:
                     messages.append({"role": msg["role"], "content": msg["content"]})
@@ -492,6 +512,49 @@ class AIWorkdeskUI:
                                     label="Max Tokens",
                                 )
 
+                                # Advanced Settings Accordion
+                                with gr.Accordion("⚙️ Advanced RAG Settings", open=False):
+                                    gr.Markdown("### 🔍 Retrieval")
+                                    top_k_slider = gr.Slider(
+                                        minimum=1,
+                                        maximum=20,
+                                        value=5,
+                                        step=1,
+                                        label="Top-K (Chunks)",
+                                    )
+                                    similarity_threshold = gr.Slider(
+                                        minimum=0.0,
+                                        maximum=1.0,
+                                        value=0.7,
+                                        step=0.05,
+                                        label="Similarity Threshold",
+                                    )
+
+                                    gr.Markdown("### 📄 Chunking")
+                                    chunk_size = gr.Dropdown(
+                                        choices=[256, 512, 1024, 2048],
+                                        value=512,
+                                        label="Chunk Size",
+                                    )
+                                    chunk_overlap = gr.Slider(
+                                        minimum=0,
+                                        maximum=200,
+                                        value=50,
+                                        step=10,
+                                        label="Chunk Overlap",
+                                    )
+
+                                    gr.Markdown("### ⚡ Pipeline")
+                                    use_reranker = gr.Checkbox(
+                                        label="Use Reranker",
+                                        value=False,
+                                    )
+                                    system_prompt = gr.Textbox(
+                                        label="System Prompt",
+                                        placeholder="You are a helpful AI assistant...",
+                                        lines=3,
+                                    )
+
                         # Chat interaction handlers
                         msg.submit(
                             self.chat_with_ai,
@@ -504,6 +567,12 @@ class AIWorkdeskUI:
                                 database_dropdown,
                                 temperature_slider,
                                 max_tokens_slider,
+                                top_k_slider,
+                                similarity_threshold,
+                                chunk_size,
+                                chunk_overlap,
+                                use_reranker,
+                                system_prompt,
                             ],
                             [chatbot, msg],
                         )
@@ -519,6 +588,12 @@ class AIWorkdeskUI:
                                 database_dropdown,
                                 temperature_slider,
                                 max_tokens_slider,
+                                top_k_slider,
+                                similarity_threshold,
+                                chunk_size,
+                                chunk_overlap,
+                                use_reranker,
+                                system_prompt,
                             ],
                             [chatbot, msg],
                         )
