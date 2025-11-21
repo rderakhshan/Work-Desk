@@ -25,6 +25,7 @@ dependencies = [
     "httpx>=0.27.0", # Modern HTTP client
     "tenacity>=8.0.0", # Retry logic
     "gradio>=5.0.0",
+    "langchain-ollama>=1.0.0",
 ]
 
 # Optional dependency groups for different AI tools

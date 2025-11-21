@@ -12,8 +12,8 @@ Run with: uv run ai-workdesk-ui
 """
 
 import os
-import gradio as gr
-from openai import OpenAI
+from ai_workdesk.core.config import get_settings
+from ai_workdesk.tools.llm.ollama_client import OllamaClient
 from loguru import logger
 
 from ai_workdesk import get_auth_manager, get_settings
@@ -47,10 +47,13 @@ class AIWorkdeskUI:
 
     @property
     def vector_store(self):
-        """Lazy load vector store to avoid blocking app startup."""
+        """Lazy load vector store with appropriate embedding provider based on settings."""
         if self._vector_store is None:
             logger.info("Initializing vector store (downloading model if needed)...")
-            self._vector_store = VectorStoreManager()
+            # Determine embedding provider: use Ollama if configured, else default to HuggingFace
+            settings = get_settings()
+            embedding_provider = "ollama" if getattr(settings, "ollama_embedding_model", None) else "huggingface"
+            self._vector_store = VectorStoreManager(embedding_provider=embedding_provider)
         return self._vector_store
 
     def _init_openai_client(self):
@@ -195,75 +198,6 @@ class AIWorkdeskUI:
             system_prompt: Custom system prompt
 
         Returns:
-            Tuple of (updated history, empty string for input)
-        """
-        if not message.strip():
-            return history, ""
-
-        if not self.openai_client:
-            error_msg = "⚠️ OpenAI is not configured. Please set OPENAI_API_KEY in .env"
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": error_msg})
-            logger.warning("Chat attempted without OpenAI configuration")
-            return history, ""
-
-        logger.info(
-            f"Processing chat with model: {model}, technique: {rag_technique}, "
-            f"embedding: {embedding_model}, db: {database_type}, temp: {temperature}\n"
-            f"Advanced: top_k={top_k}, thresh={similarity_threshold}, "
-            f"chunk={chunk_size}, overlap={chunk_overlap}, rerank={use_reranker}"
-        )
-
-        try:
-            # Prepare messages from history
-            messages = []
-            
-            # Add system prompt if provided
-            if system_prompt.strip():
-                messages.append({"role": "system", "content": system_prompt})
-            
-            for msg in history:
-                if isinstance(msg, dict) and "role" in msg and "content" in msg:
-                    messages.append({"role": msg["role"], "content": msg["content"]})
-
-            # Add current message
-            messages.append({"role": "user", "content": message})
-
-            # Get completion
-            response = self.openai_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-
-            ai_response = response.choices[0].message.content
-
-            # Log token usage
-            usage = response.usage
-            logger.info(
-                f"Tokens - Prompt: {usage.prompt_tokens}, "
-                f"Completion: {usage.completion_tokens}, "
-                f"Total: {usage.total_tokens}"
-            )
-
-            # Update history with proper format
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": ai_response})
-
-            return history, ""
-
-        except Exception as e:
-            error_msg = f"❌ Error: {str(e)}"
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": error_msg})
-            logger.error(f"Chat error: {e}")
-            return history, ""
-
-    def create_interface(self) -> gr.Blocks:
-        """Create the Gradio interface with sidebar navigation."""
-
-        # Enhanced custom CSS for sidebar and pages
         custom_css = """
         .gradio-container {
             font-family: 'Inter', sans-serif;

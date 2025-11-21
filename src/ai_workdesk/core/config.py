@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     default_embedding_model: str = Field(
         "text-embedding-3-small", description="Default embedding model"
     )
+    # Ollama configuration (local models)
+    ollama_base_url: str = Field("http://localhost:11434", description="Ollama server URL")
+    ollama_chat_model: str = Field("gemma3:4b", description="Default Ollama chat model")
+    ollama_embedding_model: str = Field("nomic-embed-text", description="Default Ollama embedding model")
     default_temperature: float = Field(0.7, ge=0.0, le=2.0, description="Default temperature")
     max_tokens: int = Field(4096, gt=0, description="Maximum tokens for generation")
 

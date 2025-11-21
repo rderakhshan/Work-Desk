@@ -61,7 +61,7 @@ id_dsa
 api_keys.py
 secrets.py
 credentials.py
-config.py
+
 
 # Testing
 .pytest_cache/

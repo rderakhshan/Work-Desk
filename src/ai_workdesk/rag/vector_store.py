@@ -5,39 +5,59 @@ import chromadb
 from chromadb.config import Settings
 from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import SentenceTransformerEmbeddings
 
 class VectorStoreManager:
-    """Manages interactions with the Vector Database (ChromaDB)."""
+    """Manages interactions with the Vector Database (ChromaDB) and supports multiple embedding providers."""
 
-    def __init__(self, persist_directory: str = "./chroma_db"):
+    def __init__(self, persist_directory: str = "./chroma_db", embedding_provider: str = "huggingface", embedding_model: Optional[str] = None):
+        """Initialize VectorStoreManager with configurable embedding provider.
+
+        Args:
+            persist_directory: Directory for ChromaDB persistence.
+            embedding_provider: One of "huggingface", "ollama", "openai".
+            embedding_model: Specific model name; if None, defaults from Settings are used.
+        """
+        from ai_workdesk.core.config import get_settings
+        settings = get_settings()
+
         self.persist_directory = persist_directory
-        self.embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
         self.client = chromadb.PersistentClient(path=persist_directory)
         self.collection_name = "ai_workdesk_collection"
-        
-        # Initialize LangChain wrapper
+
+        # Determine embedding function based on provider
+        if embedding_provider == "ollama":
+            from langchain_ollama import OllamaEmbeddings
+            model_name = embedding_model or settings.ollama_embedding_model
+            self.embedding_function = OllamaEmbeddings(model=model_name, base_url=settings.ollama_base_url)
+        elif embedding_provider == "openai":
+            from langchain_openai import OpenAIEmbeddings
+            model_name = embedding_model or settings.default_embedding_model
+            self.embedding_function = OpenAIEmbeddings(model=model_name)
+        else:  # default to huggingface
+            from langchain_community.embeddings import SentenceTransformerEmbeddings
+            model_name = embedding_model or "all-MiniLM-L6-v2"
+            self.embedding_function = SentenceTransformerEmbeddings(model_name=model_name)
+
+        # Initialize LangChain wrapper with the chosen embedding function
         self.vector_store = Chroma(
             client=self.client,
             collection_name=self.collection_name,
             embedding_function=self.embedding_function,
         )
-        logger.info(f"VectorStoreManager initialized at {persist_directory}")
+        logger.info(f"VectorStoreManager initialized at {persist_directory} with provider {embedding_provider}")
 
     def add_documents(self, chunks: List[Document]) -> bool:
-        """
-        Add document chunks to the vector store.
-        
+        """Add document chunks to the vector store.
+
         Args:
             chunks: List of Document chunks.
-            
+
         Returns:
             True if successful, False otherwise.
         """
         try:
             if not chunks:
                 return False
-                
             self.vector_store.add_documents(documents=chunks)
             logger.info(f"Added {len(chunks)} chunks to vector store")
             return True
@@ -53,11 +73,11 @@ class VectorStoreManager:
             return {
                 "status": "Ready",
                 "total_chunks": count,
-                "vector_db": "ChromaDB"
+                "vector_db": "ChromaDB",
             }
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
             return {
                 "status": "Error",
-                "error": str(e)
+                "error": str(e),
             }
