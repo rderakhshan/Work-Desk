@@ -37,6 +37,8 @@ llm = [
     "langchain-openai>=0.2.0",
     "langchain-anthropic>=0.3.0",
     "tiktoken>=0.8.0",
+    "pypdf>=4.0.0",
+    "langchain-community>=0.0.10",
 ]
 
 # Embeddings and vector stores

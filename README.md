@@ -14,6 +14,7 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🖥️ **Modern UI**: Gradio-based web interface with glassmorphism design
 - 🔍 **Advanced RAG**: Support for Naive, Hybrid, Contextual, and Graph RAG
 - ⚙️ **Granular Control**: Advanced settings for Top-K, Chunk Size, Overlap, and Reranking
+- 🧪 **Engineering Labs**: Dedicated tabs for **Embedding** (Ingestion) and **Chat** (Retrieval)
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
 
 ## 📁 Project Structure

@@ -11,20 +11,20 @@ A beautiful, secure web interface for your AI Workdesk with:
 Run with: uv run ai-workdesk-ui
 """
 
-
+import os
 import gradio as gr
 from openai import OpenAI
+from loguru import logger
 
-from ai_workdesk import get_auth_manager, get_logger, get_settings
-
-logger = get_logger(__name__)
+from ai_workdesk import get_auth_manager, get_settings
+from ai_workdesk.rag.ingestion import DocumentProcessor
+from ai_workdesk.rag.vector_store import VectorStoreManager
 
 # User credentials (in production, use a database)
 USERS = {
     "admin": "admin123",  # Default user
     "demo": "demo123",
 }
-
 
 # Constants for selections
 EMBEDDING_MODELS = ["OpenAI", "HuggingFace", "Ollama", "Google Gemini"]
@@ -39,11 +39,31 @@ class AIWorkdeskUI:
         self.settings = get_settings()
         self.auth_manager = get_auth_manager()
         self.openai_client: OpenAI | None = None
+        self._init_openai_client()
+        
+        # Initialize RAG components
+        self.doc_processor = DocumentProcessor()
+        self._vector_store = None  # Lazy load to avoid blocking on model download
 
-        # Initialize OpenAI if configured
-        if self.auth_manager.validate_service("openai"):
-            self.openai_client = OpenAI(api_key=self.settings.openai_api_key)
-            logger.info("OpenAI client initialized")
+    @property
+    def vector_store(self):
+        """Lazy load vector store to avoid blocking app startup."""
+        if self._vector_store is None:
+            logger.info("Initializing vector store (downloading model if needed)...")
+            self._vector_store = VectorStoreManager()
+        return self._vector_store
+
+    def _init_openai_client(self):
+        """Initialize OpenAI client with API key from environment."""
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            try:
+                self.openai_client = OpenAI(api_key=api_key)
+                logger.info("OpenAI client initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI client: {e}")
+        else:
+            logger.warning("OPENAI_API_KEY not found in environment variables")
 
     def authenticate(self, username: str, password: str) -> bool:
         """
@@ -66,16 +86,76 @@ class AIWorkdeskUI:
         return False
 
     def get_auth_status(self) -> str:
-        """Get authentication status as formatted string."""
-        status = self.auth_manager.check_authentication_status()
+        """Get formatted authentication status."""
+        status = []
+        
+        # OpenAI Status
+        if self.openai_client:
+            status.append("✅ **OpenAI**: Connected")
+        else:
+            status.append("❌ **OpenAI**: Not Configured")
+            
+        return "\n\n".join(status)
 
-        lines = ["### 🔐 API Service Status\n"]
-        for service, authenticated in status.items():
-            emoji = "✅" if authenticated else "❌"
-            state = "Configured" if authenticated else "Not Configured"
-            lines.append(f"- **{service}**: {emoji} {state}")
-
-        return "\n".join(lines)
+    def handle_ingestion(self, files, chunk_size, chunk_overlap, embedding_model) -> dict:
+        """
+        Process uploaded files and ingest into vector store.
+        
+        Args:
+            files: List of file objects from Gradio.
+            chunk_size: Size of chunks.
+            chunk_overlap: Overlap size.
+            embedding_model: Selected embedding model.
+            
+        Returns:
+            Updated status dictionary.
+        """
+        if not files:
+            return {
+                "status": "No files uploaded",
+                "documents": 0,
+                "chunks": 0,
+                "vector_db": "ChromaDB"
+            }
+            
+        try:
+            logger.info(f"Starting ingestion: Model={embedding_model}, Chunk={chunk_size}, Overlap={chunk_overlap}")
+            
+            # Get file paths
+            file_paths = [f.name for f in files]
+            
+            # 1. Load Documents
+            docs = self.doc_processor.load_documents(file_paths)
+            if not docs:
+                return {"status": "Failed to load documents", "error": "No valid text found"}
+                
+            # 2. Chunk Documents
+            chunks = self.doc_processor.chunk_documents(
+                docs, 
+                chunk_size=int(chunk_size), 
+                chunk_overlap=int(chunk_overlap)
+            )
+            
+            # 3. Add to Vector Store
+            # Note: Currently using default model in VectorStoreManager. 
+            # Future TODO: Pass embedding_model to VectorStoreManager
+            success = self.vector_store.add_documents(chunks)
+            
+            if success:
+                stats = self.vector_store.get_stats()
+                return {
+                    "status": "Success",
+                    "documents": len(docs),
+                    "new_chunks": len(chunks),
+                    "total_chunks": stats.get("total_chunks", 0),
+                    "vector_db": "ChromaDB"
+                }
+            else:
+                return {"status": "Failed to store embeddings"}
+                
+        except Exception as e:
+            logger.error(f"Ingestion error: {e}")
+            return {"status": "Error", "error": str(e)}
 
     def chat_with_ai(
         self,
@@ -429,131 +509,195 @@ class AIWorkdeskUI:
 
                     # Work Desk Page
                     with gr.Column(visible=False) as workdesk_page:
-                        gr.Markdown("# 💬 AI Work Desk")
+                        gr.Markdown("# 🧪 AI Engineering Labs")
 
-                        with gr.Row():
-                            with gr.Column(scale=4):
-                                chatbot = gr.Chatbot(
-                                    label="AI Assistant",
-                                    show_copy_button=True,
-                                    elem_classes=["chat-container"],
-                                    type="messages",
+                        with gr.Tabs():
+                            # Tab 1: Embedding LAB
+                            with gr.TabItem("🧬 Embedding LAB"):
+                                gr.Markdown("### 📚 Knowledge Base Management")
+                                gr.Markdown(
+                                    "Upload documents, manage your vector database, and visualize embeddings here."
                                 )
-
+                                
                                 with gr.Row():
-                                    msg = gr.Textbox(
-                                        label="Message",
-                                        placeholder="Ask me anything...",
-                                        scale=4,
-                                        show_label=False,
-                                    )
-                                    send_btn = gr.Button("Send 📤", scale=1, variant="primary")
+                                    with gr.Column(scale=1):
+                                        file_upload = gr.File(
+                                            label="Upload Documents",
+                                            file_count="multiple",
+                                            file_types=[".txt", ".pdf", ".md"],
+                                        )
+                                        
+                                        # Ingestion Settings
+                                        with gr.Accordion("⚙️ Ingestion Settings", open=True):
+                                            ingest_chunk_size = gr.Dropdown(
+                                                choices=[256, 512, 1024, 2048],
+                                                value=512,
+                                                label="Chunk Size",
+                                            )
+                                            ingest_chunk_overlap = gr.Slider(
+                                                minimum=0,
+                                                maximum=200,
+                                                value=50,
+                                                step=10,
+                                                label="Chunk Overlap",
+                                            )
+                                            ingest_embedding_model = gr.Dropdown(
+                                                choices=EMBEDDING_MODELS,
+                                                value=EMBEDDING_MODELS[1], # Default to HuggingFace
+                                                label="Embedding Model",
+                                            )
+                                        
+                                        ingest_btn = gr.Button("📥 Ingest & Embed", variant="primary")
+                                    
+                                    with gr.Column(scale=2):
+                                        gr.Markdown("#### 📊 Database Status")
+                                        db_status = gr.JSON(
+                                            value={
+                                                "status": "Ready",
+                                                "documents": 0,
+                                                "chunks": 0,
+                                                "vector_db": "ChromaDB"
+                                            },
+                                            label="Current State"
+                                        )
+                                        
+                                # Connect Ingestion
+                                ingest_btn.click(
+                                    self.handle_ingestion,
+                                    inputs=[
+                                        file_upload, 
+                                        ingest_chunk_size, 
+                                        ingest_chunk_overlap,
+                                        ingest_embedding_model
+                                    ],
+                                    outputs=[db_status]
+                                )
 
+                            # Tab 2: Chat LAB
+                            with gr.TabItem("💬 Chat LAB"):
                                 with gr.Row():
-                                    clear_btn = gr.Button(
-                                        "🗑️ Clear Chat", variant="secondary", scale=1
-                                    )
+                                    with gr.Column(scale=4):
+                                        chatbot = gr.Chatbot(
+                                            label="AI Assistant",
+                                            show_copy_button=True,
+                                            elem_classes=["chat-container"],
+                                            type="messages",
+                                        )
 
-                            with gr.Column(scale=1):
-                                model_dropdown = gr.Dropdown(
-                                    choices=[
-                                        "gpt-4o",
-                                        "gpt-4o-mini",
-                                        "gpt-4-turbo",
-                                        "gpt-4",
-                                        "gpt-3.5-turbo",
-                                    ],
-                                    value=self.settings.default_llm_model,
-                                    label="Model",
-                                    allow_custom_value=True,  # Allow custom model names
-                                )
+                                        with gr.Row():
+                                            msg = gr.Textbox(
+                                                label="Message",
+                                                placeholder="Ask me anything...",
+                                                scale=4,
+                                                show_label=False,
+                                            )
+                                            send_btn = gr.Button("Send 📤", scale=1, variant="primary")
 
-                                rag_dropdown = gr.Dropdown(
-                                    choices=[
-                                        "Naive RAG",
-                                        "Hybrid Search",
-                                        "Contextual RAG",
-                                        "Graph RAG",
-                                    ],
-                                    value="Naive RAG",
-                                    label="RAG Technique",
-                                    allow_custom_value=True,
-                                )
+                                        with gr.Row():
+                                            clear_btn = gr.Button(
+                                                "🗑️ Clear Chat", variant="secondary", scale=1
+                                            )
 
-                                embedding_dropdown = gr.Dropdown(
-                                    choices=EMBEDDING_MODELS,
-                                    value=EMBEDDING_MODELS[0],
-                                    label="Embedding Model",
-                                    allow_custom_value=True,
-                                )
+                                    with gr.Column(scale=1):
+                                        model_dropdown = gr.Dropdown(
+                                            choices=[
+                                                "gpt-4o",
+                                                "gpt-4o-mini",
+                                                "gpt-4-turbo",
+                                                "gpt-4",
+                                                "gpt-3.5-turbo",
+                                            ],
+                                            value=self.settings.default_llm_model,
+                                            label="Model",
+                                            allow_custom_value=True,  # Allow custom model names
+                                        )
 
-                                database_dropdown = gr.Dropdown(
-                                    choices=DATABASES,
-                                    value=DATABASES[0],
-                                    label="Database",
-                                    allow_custom_value=True,
-                                )
+                                        rag_dropdown = gr.Dropdown(
+                                            choices=[
+                                                "Naive RAG",
+                                                "Hybrid Search",
+                                                "Contextual RAG",
+                                                "Graph RAG",
+                                            ],
+                                            value="Naive RAG",
+                                            label="RAG Technique",
+                                            allow_custom_value=True,
+                                        )
 
-                                temperature_slider = gr.Slider(
-                                    minimum=0.0,
-                                    maximum=2.0,
-                                    value=self.settings.default_temperature,
-                                    step=0.1,
-                                    label="Temperature",
-                                )
+                                        embedding_dropdown = gr.Dropdown(
+                                            choices=EMBEDDING_MODELS,
+                                            value=EMBEDDING_MODELS[0],
+                                            label="Embedding Model",
+                                            allow_custom_value=True,
+                                        )
 
-                                max_tokens_slider = gr.Slider(
-                                    minimum=100,
-                                    maximum=8192,  # Increased to support larger token limits
-                                    value=min(
-                                        self.settings.max_tokens, 8192
-                                    ),  # Ensure value is within range
-                                    step=100,
-                                    label="Max Tokens",
-                                )
+                                        database_dropdown = gr.Dropdown(
+                                            choices=DATABASES,
+                                            value=DATABASES[0],
+                                            label="Database",
+                                            allow_custom_value=True,
+                                        )
 
-                                # Advanced Settings Accordion
-                                with gr.Accordion("⚙️ Advanced RAG Settings", open=False):
-                                    gr.Markdown("### 🔍 Retrieval")
-                                    top_k_slider = gr.Slider(
-                                        minimum=1,
-                                        maximum=20,
-                                        value=5,
-                                        step=1,
-                                        label="Top-K (Chunks)",
-                                    )
-                                    similarity_threshold = gr.Slider(
-                                        minimum=0.0,
-                                        maximum=1.0,
-                                        value=0.7,
-                                        step=0.05,
-                                        label="Similarity Threshold",
-                                    )
+                                        temperature_slider = gr.Slider(
+                                            minimum=0.0,
+                                            maximum=2.0,
+                                            value=self.settings.default_temperature,
+                                            step=0.1,
+                                            label="Temperature",
+                                        )
 
-                                    gr.Markdown("### 📄 Chunking")
-                                    chunk_size = gr.Dropdown(
-                                        choices=[256, 512, 1024, 2048],
-                                        value=512,
-                                        label="Chunk Size",
-                                    )
-                                    chunk_overlap = gr.Slider(
-                                        minimum=0,
-                                        maximum=200,
-                                        value=50,
-                                        step=10,
-                                        label="Chunk Overlap",
-                                    )
+                                        max_tokens_slider = gr.Slider(
+                                            minimum=100,
+                                            maximum=8192,  # Increased to support larger token limits
+                                            value=min(
+                                                self.settings.max_tokens, 8192
+                                            ),  # Ensure value is within range
+                                            step=100,
+                                            label="Max Tokens",
+                                        )
 
-                                    gr.Markdown("### ⚡ Pipeline")
-                                    use_reranker = gr.Checkbox(
-                                        label="Use Reranker",
-                                        value=False,
-                                    )
-                                    system_prompt = gr.Textbox(
-                                        label="System Prompt",
-                                        placeholder="You are a helpful AI assistant...",
-                                        lines=3,
-                                    )
+                                        # Advanced Settings Accordion
+                                        with gr.Accordion("⚙️ Advanced RAG Settings", open=False):
+                                            gr.Markdown("### 🔍 Retrieval")
+                                            top_k_slider = gr.Slider(
+                                                minimum=1,
+                                                maximum=20,
+                                                value=5,
+                                                step=1,
+                                                label="Top-K (Chunks)",
+                                            )
+                                            similarity_threshold = gr.Slider(
+                                                minimum=0.0,
+                                                maximum=1.0,
+                                                value=0.7,
+                                                step=0.05,
+                                                label="Similarity Threshold",
+                                            )
+
+                                            gr.Markdown("### 📄 Chunking")
+                                            chunk_size = gr.Dropdown(
+                                                choices=[256, 512, 1024, 2048],
+                                                value=512,
+                                                label="Chunk Size",
+                                            )
+                                            chunk_overlap = gr.Slider(
+                                                minimum=0,
+                                                maximum=200,
+                                                value=50,
+                                                step=10,
+                                                label="Chunk Overlap",
+                                            )
+
+                                            gr.Markdown("### ⚡ Pipeline")
+                                            use_reranker = gr.Checkbox(
+                                                label="Use Reranker",
+                                                value=False,
+                                            )
+                                            system_prompt = gr.Textbox(
+                                                label="System Prompt",
+                                                placeholder="You are a helpful AI assistant...",
+                                                lines=3,
+                                            )
 
                         # Chat interaction handlers
                         msg.submit(
@@ -812,3 +956,4 @@ if __name__ != "__main__":
 
 if __name__ == "__main__":
     main()
+
