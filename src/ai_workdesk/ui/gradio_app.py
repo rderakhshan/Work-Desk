@@ -26,6 +26,11 @@ USERS = {
 }
 
 
+# Constants for selections
+EMBEDDING_MODELS = ["OpenAI", "HuggingFace", "Ollama", "Google Gemini"]
+DATABASES = ["ChromaDB", "FAISS", "PostgreSQL (PGVector)", "SQLite", "Pinecone"]
+
+
 class AIWorkdeskUI:
     """AI Workdesk Gradio UI with authentication and multi-page navigation."""
 
@@ -77,6 +82,9 @@ class AIWorkdeskUI:
         message: str,
         history: list,
         model: str,
+        rag_technique: str,
+        embedding_model: str,
+        database_type: str,
         temperature: float,
         max_tokens: int,
     ) -> tuple:
@@ -87,6 +95,9 @@ class AIWorkdeskUI:
             message: User message
             history: Chat history
             model: Model name
+            rag_technique: RAG technique to use
+            embedding_model: Embedding model to use
+            database_type: Database type to use
             temperature: Temperature setting
             max_tokens: Maximum tokens
 
@@ -103,7 +114,10 @@ class AIWorkdeskUI:
             logger.warning("Chat attempted without OpenAI configuration")
             return history, ""
 
-        logger.info(f"Processing chat with model: {model}, temp: {temperature}")
+        logger.info(
+            f"Processing chat with model: {model}, technique: {rag_technique}, "
+            f"embedding: {embedding_model}, db: {database_type}, temp: {temperature}"
+        )
 
         try:
             # Prepare messages from history
@@ -434,6 +448,32 @@ class AIWorkdeskUI:
                                     allow_custom_value=True,  # Allow custom model names
                                 )
 
+                                rag_dropdown = gr.Dropdown(
+                                    choices=[
+                                        "Naive RAG",
+                                        "Hybrid Search",
+                                        "Contextual RAG",
+                                        "Graph RAG",
+                                    ],
+                                    value="Naive RAG",
+                                    label="RAG Technique",
+                                    allow_custom_value=True,
+                                )
+
+                                embedding_dropdown = gr.Dropdown(
+                                    choices=EMBEDDING_MODELS,
+                                    value=EMBEDDING_MODELS[0],
+                                    label="Embedding Model",
+                                    allow_custom_value=True,
+                                )
+
+                                database_dropdown = gr.Dropdown(
+                                    choices=DATABASES,
+                                    value=DATABASES[0],
+                                    label="Database",
+                                    allow_custom_value=True,
+                                )
+
                                 temperature_slider = gr.Slider(
                                     minimum=0.0,
                                     maximum=2.0,
@@ -455,13 +495,31 @@ class AIWorkdeskUI:
                         # Chat interaction handlers
                         msg.submit(
                             self.chat_with_ai,
-                            [msg, chatbot, model_dropdown, temperature_slider, max_tokens_slider],
+                            [
+                                msg,
+                                chatbot,
+                                model_dropdown,
+                                rag_dropdown,
+                                embedding_dropdown,
+                                database_dropdown,
+                                temperature_slider,
+                                max_tokens_slider,
+                            ],
                             [chatbot, msg],
                         )
 
                         send_btn.click(
                             self.chat_with_ai,
-                            [msg, chatbot, model_dropdown, temperature_slider, max_tokens_slider],
+                            [
+                                msg,
+                                chatbot,
+                                model_dropdown,
+                                rag_dropdown,
+                                embedding_dropdown,
+                                database_dropdown,
+                                temperature_slider,
+                                max_tokens_slider,
+                            ],
                             [chatbot, msg],
                         )
 
@@ -668,6 +726,14 @@ def main() -> None:
         auth=True,  # Enable authentication
     )
 
+
+# Expose demo for Gradio CLI auto-reload
+if __name__ != "__main__":
+    try:
+        _ui = AIWorkdeskUI()
+        demo = _ui.create_interface()
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()

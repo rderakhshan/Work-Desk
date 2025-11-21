@@ -77,9 +77,9 @@ ai-workdesk-ui = "ai_workdesk.ui.gradio_app:main"
 requires = ["uv_build>=0.9.7,<0.10.0"]
 build-backend = "uv_build"
 
-# UV-specific configuration
-[tool.uv]
-dev-dependencies = [
+# Dependency groups
+[dependency-groups]
+dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.23.0",

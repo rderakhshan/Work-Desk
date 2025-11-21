@@ -11,6 +11,9 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🧪 **Ready for Testing**: Pre-configured pytest, ruff, and mypy
 - 📝 **Type-Safe**: Full type hints with mypy validation
 - 🎨 **Beautiful Console**: Rich terminal output with loguru logging
+- 🖥️ **Modern UI**: Gradio-based web interface with glassmorphism design
+- 🔍 **Advanced RAG**: Support for Naive, Hybrid, Contextual, and Graph RAG
+- 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
 
 ## 📁 Project Structure
 
@@ -62,7 +65,12 @@ cp .env.example .env
 # Edit .env and add your API keys
 ```
 
-4. **Test the installation:**
+4. **Run the Web UI (with Auto-Reload):**
+```bash
+uv run gradio src/ai_workdesk/ui/gradio_app.py
+```
+
+5. **Run the CLI (Optional):**
 ```bash
 uv run ai-workdesk
 ```
