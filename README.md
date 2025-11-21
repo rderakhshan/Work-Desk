@@ -27,6 +27,11 @@ ai-workdesk/
 │       │   ├── auth.py       # Authentication manager
 │       │   ├── config.py     # Configuration management
 │       │   └── logger.py     # Logging setup
+│       ├── rag/              # RAG pipeline
+│       │   ├── ingestion.py  # Document processing & chunking
+│       │   └── vector_store.py # Vector database management
+│       ├── ui/               # User interfaces
+│       │   └── gradio_app.py # Gradio web interface
 │       ├── tools/            # AI tools collection
 │       │   ├── llm/         # LLM tools
 │       │   ├── embeddings/  # Embedding tools
@@ -34,6 +39,9 @@ ai-workdesk/
 │       │   └── vision/      # Vision tools
 │       └── utils/           # Shared utilities
 ├── tests/                   # Test suite
+│   ├── unit/               # Unit tests
+│   ├── integration/        # Integration tests
+│   └── manual/             # Manual test scripts
 ├── notebooks/               # Jupyter notebooks
 ├── data/                    # Data directory
 ├── config/                  # Configuration files
@@ -173,6 +181,62 @@ uv run jupyter notebook
 # Start Jupyter lab
 uv run jupyter lab
 ```
+
+## 📄 Document Ingestion & RAG Pipeline
+
+The AI Workdesk includes a complete RAG (Retrieval-Augmented Generation) pipeline with document ingestion and vector storage capabilities.
+
+### 🧬 Embedding LAB (Document Ingestion)
+
+Upload and process documents to build your knowledge base:
+
+1. **Navigate to Work Desk → Embedding LAB**
+2. **Upload Documents**: Support for `.txt`, `.pdf`, and `.md` files
+3. **Configure Ingestion Settings**:
+   - **Chunk Size**: 256, 512, 1024, or 2048 tokens
+   - **Chunk Overlap**: 0-200 tokens (recommended: 50)
+   - **Embedding Model**: OpenAI, HuggingFace, Ollama, or Google Gemini
+4. **Click "Ingest & Embed"** to process and store documents
+
+The system will:
+- Load and parse your documents
+- Split them into optimized chunks
+- Generate embeddings using the selected model
+- Store vectors in ChromaDB for fast retrieval
+
+### 💬 Chat LAB (RAG-Enhanced Chat)
+
+Interact with your documents using advanced RAG techniques:
+
+**Basic Settings:**
+- **Model Selection**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo
+- **RAG Technique**: Naive RAG, Hybrid Search, Contextual RAG, Graph RAG
+- **Embedding Model**: Choose from multiple providers
+- **Database**: ChromaDB, FAISS, PGVector, SQLite, Pinecone
+- **Temperature**: 0.0 (focused) to 2.0 (creative)
+- **Max Tokens**: Up to 8192 tokens
+
+**Advanced RAG Settings:**
+- **Top-K Retrieval**: Number of chunks to retrieve (1-20)
+- **Similarity Threshold**: Minimum similarity score (0.0-1.0)
+- **Chunk Size**: Token size for document chunks
+- **Chunk Overlap**: Overlap between consecutive chunks
+- **Reranker**: Enable/disable result reranking
+- **System Prompt**: Custom instructions for the AI
+
+### Supported File Formats
+
+- **Text Files** (`.txt`): Plain text documents
+- **PDF Files** (`.pdf`): Portable Document Format
+- **Markdown** (`.md`): Markdown formatted documents
+
+### Vector Store
+
+- **Default**: ChromaDB (persistent storage)
+- **Location**: `./chroma_db/` directory
+- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (default)
+- **Features**: Automatic persistence, metadata support, similarity search
+
 
 ## 📚 Usage Examples
 
