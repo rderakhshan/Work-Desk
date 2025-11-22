@@ -59,16 +59,17 @@ class AIWorkdeskUI:
         return self._vector_store
 
     def _init_openai_client(self):
-        """Initialize OpenAI client with API key from environment."""
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key:
+        """Initialize OpenAI client with API key from settings."""
+        if self.settings.openai_api_key:
             try:
-                self.openai_client = OpenAI(api_key=api_key)
-                logger.info("OpenAI client initialized")
+                self.openai_client = OpenAI(api_key=self.settings.openai_api_key)
+                logger.info("OpenAI client initialized successfully")
             except Exception as e:
                 logger.error(f"Failed to initialize OpenAI client: {e}")
+                self.openai_client = None
         else:
-            logger.warning("OPENAI_API_KEY not found in environment variables")
+            logger.warning("OPENAI_API_KEY not found in .env file")
+            self.openai_client = None
 
     def authenticate(self, username: str, password: str) -> bool:
         """
