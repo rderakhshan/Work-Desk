@@ -454,36 +454,44 @@ class AIWorkdeskUI:
                                 )
                                 
                                 with gr.Row():
+                                    # Left Column - File Upload
                                     with gr.Column(scale=1):
                                         file_upload = gr.File(
-                                            label="Upload Documents",
+                                            label="📄 Upload Documents",
                                             file_count="multiple",
                                             file_types=[".txt", ".pdf", ".md"],
+                                            height=200,
                                         )
-                                        
-                                        # Ingestion Settings
-                                        with gr.Accordion("⚙️ Ingestion Settings", open=True):
-                                            ingest_chunk_size = gr.Dropdown(
-                                                choices=[256, 512, 1024, 2048],
-                                                value=512,
-                                                label="Chunk Size",
-                                            )
-                                            ingest_chunk_overlap = gr.Slider(
-                                                minimum=0,
-                                                maximum=200,
-                                                value=50,
-                                                step=10,
-                                                label="Chunk Overlap",
-                                            )
-                                            ingest_embedding_model = gr.Dropdown(
-                                                choices=EMBEDDING_MODELS,
-                                                value=EMBEDDING_MODELS[1], # Default to HuggingFace
-                                                label="Embedding Model",
-                                            )
-                                        
-                                        ingest_btn = gr.Button("📥 Ingest & Embed", variant="primary")
+                                        ingest_btn = gr.Button(
+                                            "📥 Ingest & Embed", 
+                                            variant="primary",
+                                            size="lg",
+                                            scale=1
+                                        )
                                     
-                                    with gr.Column(scale=2):
+                                    # Middle Column - Ingestion Settings
+                                    with gr.Column(scale=1):
+                                        gr.Markdown("#### ⚙️ Ingestion Settings")
+                                        ingest_chunk_size = gr.Dropdown(
+                                            choices=[256, 512, 1024, 2048],
+                                            value=512,
+                                            label="Chunk Size",
+                                        )
+                                        ingest_chunk_overlap = gr.Slider(
+                                            minimum=0,
+                                            maximum=200,
+                                            value=50,
+                                            step=10,
+                                            label="Chunk Overlap",
+                                        )
+                                        ingest_embedding_model = gr.Dropdown(
+                                            choices=EMBEDDING_MODELS,
+                                            value=EMBEDDING_MODELS[2], # Default to Ollama
+                                            label="Embedding Model",
+                                        )
+                                    
+                                    # Right Column - Database Status
+                                    with gr.Column(scale=1):
                                         gr.Markdown("#### 📊 Database Status")
                                         db_status = gr.JSON(
                                             value={
@@ -821,6 +829,33 @@ class AIWorkdeskUI:
                 show_about,
                 None,
                 [home_page, workdesk_page, about_page, home_btn, workdesk_btn, about_btn],
+            )
+            
+            # Footer
+            gr.HTML(
+                """
+                <div style="
+                    text-align: center;
+                    padding: 30px 20px;
+                    margin-top: 40px;
+                    border-top: 2px solid rgba(102, 126, 234, 0.2);
+                    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+                ">
+                    <h2 style="
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        font-size: 2em;
+                        font-weight: 800;
+                        margin-bottom: 10px;
+                    ">🚀 AI Work Desk</h2>
+                    <p style="
+                        color: #666;
+                        font-size: 1.2em;
+                        margin: 0;
+                    ">Professional AI Engineering Environment</p>
+                </div>
+                """
             )
 
         return demo
