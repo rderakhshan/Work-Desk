@@ -209,40 +209,59 @@ class AIWorkdeskUI:
             # Add user message to history
             history.append({"role": "user", "content": message})
             
-            # Initialize Ollama client with selected model or default
-            # Extract model name if it's in format like "gpt-4o" or use as-is
-            ollama_model = self.settings.ollama_chat_model
+            # Step 1: Retrieve relevant documents from vector store
+            logger.info(f"Retrieving documents for query: {message[:50]}...")
+            relevant_docs = self.vector_store.similarity_search(
+                query=message,
+                k=top_k,
+                score_threshold=similarity_threshold
+            )
             
-            # Check if user selected a specific model
+            # Step 2: Build context from retrieved documents
+            if relevant_docs:
+                context = "\n\n".join([
+                    f"Document {i+1}:\n{doc.page_content}" 
+                    for i, doc in enumerate(relevant_docs)
+                ])
+                logger.info(f"Retrieved {len(relevant_docs)} relevant documents")
+            else:
+                context = "No relevant documents found in the knowledge base."
+                logger.warning("No documents retrieved from vector store")
+            
+            # Step 3: Build RAG prompt
+            rag_prompt = ""
+            if system_prompt:
+                rag_prompt += f"System Instructions: {system_prompt}\n\n"
+            
+            rag_prompt += f"""You are a helpful AI assistant. Answer the user's question based on the following context from the knowledge base.
+
+Context from Knowledge Base:
+{context}
+
+User Question: {message}
+
+Instructions:
+- Answer based primarily on the provided context
+- If the context doesn't contain enough information, say so
+- Be concise and accurate
+- Cite specific parts of the context when relevant
+
+Answer:"""
+            
+            # Step 4: Initialize Ollama client with parameters
+            ollama_model = self.settings.ollama_chat_model
             if model and not model.startswith("gpt"):
-                # Assume it's an Ollama model
                 ollama_model = model
             
-            # Create Ollama client with temperature and max_tokens
             client = OllamaClient(
                 model=ollama_model,
                 temperature=temperature,
                 max_tokens=max_tokens
             )
             
-            # Build conversation context from history
-            conversation = ""
-            if system_prompt:
-                conversation = f"System: {system_prompt}\n\n"
-            
-            # Add recent history (last 5 exchanges to keep context manageable)
-            recent_history = history[-10:] if len(history) > 10 else history
-            for msg in recent_history[:-1]:  # Exclude the last message (current user message)
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
-                conversation += f"{role.capitalize()}: {content}\n"
-            
-            # Add current message
-            conversation += f"User: {message}\nAssistant:"
-            
-            # Get response from Ollama
-            logger.info(f"Sending message to Ollama model: {ollama_model}")
-            response = client.chat(conversation)
+            # Step 5: Get RAG response
+            logger.info(f"Generating RAG response with model: {ollama_model}")
+            response = client.chat(rag_prompt)
             
             # Add assistant response to history
             history.append({"role": "assistant", "content": response})
@@ -250,8 +269,8 @@ class AIWorkdeskUI:
             return history, ""
             
         except Exception as e:
-            logger.error(f"Chat error: {e}")
-            error_msg = f"Error: {str(e)}"
+            logger.error(f"RAG chat error: {e}")
+            error_msg = f"Error: {str(e)}\n\nNote: Make sure you have ingested documents in the Embedding LAB first."
             history.append({"role": "assistant", "content": error_msg})
             return history, ""
 

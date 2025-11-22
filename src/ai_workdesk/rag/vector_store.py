@@ -81,3 +81,30 @@ class VectorStoreManager:
                 "status": "Error",
                 "error": str(e),
             }
+
+    def similarity_search(self, query: str, k: int = 5, score_threshold: float = 0.0) -> List[Document]:
+        """Search for similar documents in the vector store.
+
+        Args:
+            query: The search query.
+            k: Number of results to return.
+            score_threshold: Minimum similarity score (0.0-1.0).
+
+        Returns:
+            List of relevant Document chunks.
+        """
+        try:
+            # Use similarity_search_with_score to get scores
+            results_with_scores = self.vector_store.similarity_search_with_score(query, k=k)
+            
+            # Filter by threshold and extract documents
+            filtered_docs = [
+                doc for doc, score in results_with_scores 
+                if score >= score_threshold
+            ]
+            
+            logger.info(f"Retrieved {len(filtered_docs)} documents for query (threshold: {score_threshold})")
+            return filtered_docs
+        except Exception as e:
+            logger.error(f"Error during similarity search: {e}")
+            return []
