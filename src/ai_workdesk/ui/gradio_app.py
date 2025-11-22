@@ -198,6 +198,14 @@ class AIWorkdeskUI:
             system_prompt: Custom system prompt
 
         Returns:
+            Tuple of (updated chat history, empty string for message box)
+        """
+        # Placeholder - implement actual chat logic
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": "This is a placeholder response. Implement actual chat logic here."})
+        return history, ""
+
+    def create_interface(self) -> "gr.Blocks":
         custom_css = """
         .gradio-container {
             font-family: 'Inter', sans-serif;
