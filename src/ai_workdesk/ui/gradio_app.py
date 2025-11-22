@@ -218,8 +218,12 @@ class AIWorkdeskUI:
                 # Assume it's an Ollama model
                 ollama_model = model
             
-            # Create Ollama client
-            client = OllamaClient(model=ollama_model)
+            # Create Ollama client with temperature and max_tokens
+            client = OllamaClient(
+                model=ollama_model,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
             
             # Build conversation context from history
             conversation = ""
@@ -586,13 +590,19 @@ class AIWorkdeskUI:
                                     with gr.Column(scale=1):
                                         model_dropdown = gr.Dropdown(
                                             choices=[
+                                                # Ollama Models (Local)
+                                                "gemma3:4b",
+                                                "llama3",
+                                                "mistral",
+                                                "phi3",
+                                                # OpenAI Models (Cloud)
                                                 "gpt-4o",
                                                 "gpt-4o-mini",
                                                 "gpt-4-turbo",
                                                 "gpt-4",
                                                 "gpt-3.5-turbo",
                                             ],
-                                            value=self.settings.default_llm_model,
+                                            value="gemma3:4b",  # Default to Ollama
                                             label="Model",
                                             allow_custom_value=True,  # Allow custom model names
                                         )
