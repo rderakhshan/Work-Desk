@@ -277,17 +277,6 @@ class AIWorkdeskUI:
             css=custom_css,
             title="AI Workdesk",
         ) as demo:
-            # Header
-            gr.HTML(
-                """
-                <div style="text-align: center; padding: 20px;">
-                    <h1 class="header-title">🚀 AI Workdesk</h1>
-                    <p style="color: #666; font-size: 1.1em;">
-                        Your Professional AI Development Environment
-                    </p>
-                </div>
-                """
-            )
 
             with gr.Row():
                 # Sidebar
