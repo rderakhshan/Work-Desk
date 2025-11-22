@@ -269,18 +269,32 @@ class AIWorkdeskUI:
         return "\n".join(status)
 
     def load_metadata(self, page: int = 1) -> Tuple[List[List], int]:
-        """Load metadata entries for the specified page."""
+        """Load metadata entries for the specified page, showing only unique filenames."""
         # Ensure page is at least 1
         page = max(1, int(page))
-        offset = (page - 1) * self.page_size
-        entries = self.metadata_store.list_entries(limit=self.page_size, offset=offset)
-        total_count = self.metadata_store.total_count()
+        
+        # Get all entries and deduplicate by filename (keep most recent)
+        all_entries = self.metadata_store.list_entries(limit=1000, offset=0)
+        
+        # Group by filename, keep only the most recent entry for each
+        unique_entries = {}
+        for e in all_entries:
+            filename = e["filename"]
+            if filename not in unique_entries or e["upload_ts"] > unique_entries[filename]["upload_ts"]:
+                unique_entries[filename] = e
+        
+        # Convert to list and sort by upload time (most recent first)
+        entries_list = sorted(unique_entries.values(), key=lambda x: x["upload_ts"], reverse=True)
+        
+        # Paginate
+        total_count = len(entries_list)
         max_page = max(1, (total_count + self.page_size - 1) // self.page_size)
+        offset = (page - 1) * self.page_size
+        paginated_entries = entries_list[offset:offset + self.page_size]
         
         # Format for Dataframe
         data = []
-        for e in entries:
-            # e is a dictionary
+        for e in paginated_entries:
             data.append([e["id"], e["filename"], e["size"], e["upload_ts"], e["doc_type"]])
             
         return data, max_page
@@ -553,27 +567,15 @@ Please answer based on the context provided above."""
                     gr.Markdown(self.get_auth_status())
                     
                     # Logo at very bottom (below status)
-                    gr.HTML("""
-                    <div class="sidebar-logo">
-                        <svg width="100%" height="auto" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                            <defs>
-                                <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-                                    <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
-                                </linearGradient>
-                            </defs>
-                            <rect width="200" height="200" rx="30" fill="url(#logoGrad)"/>
-                            <circle cx="100" cy="70" r="25" fill="white" opacity="0.9"/>
-                            <circle cx="70" cy="120" r="15" fill="white" opacity="0.7"/>
-                            <circle cx="130" cy="120" r="15" fill="white" opacity="0.7"/>
-                            <circle cx="100" cy="150" r="10" fill="white" opacity="0.5"/>
-                            <line x1="100" y1="70" x2="70" y2="120" stroke="white" stroke-width="3" opacity="0.6"/>
-                            <line x1="100" y1="70" x2="130" y2="120" stroke="white" stroke-width="3" opacity="0.6"/>
-                            <line x1="70" y1="120" x2="100" y2="150" stroke="white" stroke-width="2" opacity="0.4"/>
-                            <line x1="130" y1="120" x2="100" y2="150" stroke="white" stroke-width="2" opacity="0.4"/>
-                        </svg>
-                    </div>
-                    """)
+                    import os
+                    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+                    gr.Image(
+                        value=logo_path,
+                        show_label=False,
+                        show_download_button=False,
+                        container=False,
+                        elem_classes=["sidebar-logo"]
+                    )
 
                 # Main Content
                 with gr.Column(scale=5):
@@ -607,19 +609,44 @@ Please answer based on the context provided above."""
                                         )
 
                                     with gr.TabItem("📋 Metadata"):
-                                        gr.Markdown("### 🗄️ Ingested Files Metadata")
+                                        gr.Markdown("### 🗄️ Ingested Files")
+                                        gr.Markdown("*Showing unique documents (most recent version)*")
+                                        
+                                        metadata_df = gr.Dataframe(
+                                            headers=["ID", "Filename", "Size (bytes)", "Uploaded", "Type"],
+                                            label="Document Metadata",
+                                            interactive=False,
+                                            wrap=True
+                                        )
+                                        
                                         with gr.Row():
-                                            metadata_df = gr.Dataframe(
-                                                headers=["ID", "Filename", "Size (bytes)", "Uploaded", "Type"],
-                                                label="Ingested Files",
-                                                interactive=False
+                                            page_slider = gr.Slider(
+                                                minimum=1, 
+                                                maximum=1, 
+                                                step=1, 
+                                                value=1, 
+                                                label="📄 Page",
+                                                scale=2
                                             )
+                                            refresh_btn = gr.Button(
+                                                "🔄 Refresh", 
+                                                variant="secondary",
+                                                elem_classes=["secondary-btn"],
+                                                scale=1
+                                            )
+                                        
                                         with gr.Row():
-                                            page_slider = gr.Slider(minimum=1, maximum=1, step=1, value=1, label="Page")
-                                            refresh_btn = gr.Button("🔄 Refresh", elem_classes=["secondary-btn"])
-                                        with gr.Row():
-                                            delete_id = gr.Number(label="Entry ID to delete", precision=0)
-                                            delete_btn = gr.Button("🗑️ Delete Entry", variant="stop", elem_classes=["secondary-btn"])
+                                            delete_id = gr.Number(
+                                                label="🗑️ Entry ID to Delete", 
+                                                precision=0,
+                                                scale=2
+                                            )
+                                            delete_btn = gr.Button(
+                                                "Delete Entry", 
+                                                variant="stop",
+                                                elem_classes=["secondary-btn"],
+                                                scale=1
+                                            )
                                         
                                         # Callbacks
                                         refresh_btn.click(
