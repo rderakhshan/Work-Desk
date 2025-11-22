@@ -8,7 +8,8 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - ⚡ **Ultra-Fast Setup**: Powered by `uv` - 10-100x faster than pip
 - 🔐 **Secure Authentication**: Environment-based API key management
 - 📦 **Modular Design**: Organized tools for LLMs, embeddings, RAG, and vision
-- 🧪 **Ready for Testing**: Pre-configured pytest, ruff, and mypy
+- � **Local Model Support**: Integrated Ollama for running models locally (Gemma, Llama, etc.)
+- �🧪 **Ready for Testing**: Pre-configured pytest, ruff, and mypy
 - 📝 **Type-Safe**: Full type hints with mypy validation
 - 🎨 **Beautiful Console**: Rich terminal output with loguru logging
 - 🖥️ **Modern UI**: Gradio-based web interface with glassmorphism design
@@ -16,6 +17,7 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - ⚙️ **Granular Control**: Advanced settings for Top-K, Chunk Size, Overlap, and Reranking
 - 🧪 **Engineering Labs**: Dedicated tabs for **Embedding** (Ingestion) and **Chat** (Retrieval)
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
+- 🌐 **Flexible Providers**: Support for OpenAI, HuggingFace, Ollama, and Google Gemini embeddings
 
 ## 📁 Project Structure
 
@@ -34,16 +36,23 @@ ai-workdesk/
 │       │   └── gradio_app.py # Gradio web interface
 │       ├── tools/            # AI tools collection
 │       │   ├── llm/         # LLM tools
+│       │   │   └── ollama_client.py # Ollama local model wrapper
 │       │   ├── embeddings/  # Embedding tools
 │       │   ├── retrieval/   # RAG tools
 │       │   └── vision/      # Vision tools
 │       └── utils/           # Shared utilities
+├── docs/                    # Documentation
+│   ├── IMPLEMENTATION_PLAN_OLLAMA.md # Ollama integration plan
+│   ├── QUICK_START.md      # Quick start guide
+│   ├── UI_GUIDE.md         # UI usage guide
+│   └── system_prompt_template.md # System prompt examples
 ├── tests/                   # Test suite
 │   ├── unit/               # Unit tests
 │   ├── integration/        # Integration tests
 │   └── manual/             # Manual test scripts
 ├── notebooks/               # Jupyter notebooks
 ├── data/                    # Data directory
+│   └── chroma_db/          # ChromaDB persistent storage
 ├── config/                  # Configuration files
 └── scripts/                 # Utility scripts
 ```
@@ -54,6 +63,7 @@ ai-workdesk/
 
 - Python 3.12+
 - `uv` installed ([Install Guide](https://docs.astral.sh/uv/getting-started/installation/))
+- **Optional**: [Ollama](https://ollama.ai/) for local model support (recommended for privacy and offline use)
 
 ### Installation
 
@@ -75,14 +85,22 @@ cp .env.example .env
 # Edit .env and add your API keys
 ```
 
-4. **Run the Web UI (with Auto-Reload):**
+4. **Run the Web UI:**
 ```bash
-uv run gradio src/ai_workdesk/ui/gradio_app.py
+uv run ai-workdesk-ui
 ```
 
-5. **Run the CLI (Optional):**
+**Default Login Credentials:**
+- Username: `admin`
+- Password: `admin123`
+
+5. **Optional - Install Ollama for Local Models:**
 ```bash
-uv run ai-workdesk
+# Download and install Ollama from https://ollama.ai/
+
+# Pull recommended models
+ollama pull gemma3:4b          # Chat model
+ollama pull nomic-embed-text   # Embedding model
 ```
 
 ## 🔐 Authentication Setup
@@ -92,18 +110,42 @@ uv run ai-workdesk
 Create a `.env` file in the project root:
 
 ```bash
-# LLM API Keys
+# LLM API Keys (Optional - for cloud models)
 OPENAI_API_KEY=your-openai-api-key-here
 ANTHROPIC_API_KEY=your-anthropic-api-key-here
 
 # Model Configuration
 DEFAULT_LLM_MODEL=gpt-4o-mini
 DEFAULT_TEMPERATURE=0.7
+
+# Ollama Configuration (for local models)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=gemma3:4b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
-### Option 2: System Keyring (Advanced)
+### Option 2: Ollama Local Models (Privacy-First)
 
-For enhanced security, use UV's keyring provider:
+For complete privacy and offline usage, use Ollama without any API keys:
+
+1. **Install Ollama**: Download from [ollama.ai](https://ollama.ai/)
+2. **Pull Models**:
+   ```bash
+   ollama pull gemma3:4b          # Fast chat model
+   ollama pull nomic-embed-text   # Embedding model
+   ```
+3. **Configure `.env`**:
+   ```bash
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_CHAT_MODEL=gemma3:4b
+   OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+   ```
+
+The system will automatically use Ollama models when configured, with no cloud API keys required.
+
+### Option 3: System Keyring (Advanced)
+
+For enhanced security with cloud APIs, use UV's keyring provider:
 
 ```bash
 # Enable keyring provider
@@ -195,7 +237,11 @@ Upload and process documents to build your knowledge base:
 3. **Configure Ingestion Settings**:
    - **Chunk Size**: 256, 512, 1024, or 2048 tokens
    - **Chunk Overlap**: 0-200 tokens (recommended: 50)
-   - **Embedding Model**: OpenAI, HuggingFace, Ollama, or Google Gemini
+   - **Embedding Model**: Choose from:
+     - **Ollama** (default, privacy-first, offline)
+     - OpenAI
+     - HuggingFace
+     - Google Gemini
 4. **Click "Ingest & Embed"** to process and store documents
 
 The system will:
@@ -209,9 +255,11 @@ The system will:
 Interact with your documents using advanced RAG techniques:
 
 **Basic Settings:**
-- **Model Selection**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo
+- **Model Selection**: 
+  - **Cloud**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo
+  - **Local (Ollama)**: Gemma3:4b, Llama 3, Mistral, and more
 - **RAG Technique**: Naive RAG, Hybrid Search, Contextual RAG, Graph RAG
-- **Embedding Model**: Choose from multiple providers
+- **Embedding Model**: Ollama (default), OpenAI, HuggingFace, Google Gemini
 - **Database**: ChromaDB, FAISS, PGVector, SQLite, Pinecone
 - **Temperature**: 0.0 (focused) to 2.0 (creative)
 - **Max Tokens**: Up to 8192 tokens
@@ -233,8 +281,11 @@ Interact with your documents using advanced RAG techniques:
 ### Vector Store
 
 - **Default**: ChromaDB (persistent storage)
-- **Location**: `./chroma_db/` directory
-- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (default)
+- **Location**: `./data/chroma_db/` directory
+- **Embedding Models**: 
+  - **Ollama**: `nomic-embed-text` (default, local)
+  - **HuggingFace**: `sentence-transformers/all-MiniLM-L6-v2`
+  - **OpenAI**: `text-embedding-3-small`
 - **Features**: Automatic persistence, metadata support, similarity search
 
 
@@ -259,7 +310,27 @@ logger = get_logger(__name__)
 logger.info("AI Workdesk initialized!")
 ```
 
-### Using LLM Tools (After installing `llm` extras)
+### Using LLM Tools
+
+**Option 1: Using Ollama (Local, Privacy-First)**
+
+```python
+from ai_workdesk.tools.llm.ollama_client import OllamaClient
+
+# Initialize with default model from .env (gemma3:4b)
+client = OllamaClient()
+
+# Chat with the model
+response = client.chat("Explain quantum computing in simple terms")
+print(response)
+
+# Use a different model
+client = OllamaClient(model="llama3")
+response = client.chat("Hello!")
+print(response)
+```
+
+**Option 2: Using OpenAI (Cloud)**
 
 ```bash
 # First install LLM extras
@@ -288,12 +359,23 @@ All configuration is managed through environment variables and `pyproject.toml`:
 
 See `.env.example` for all available options:
 
-- **LLM API Keys**: OpenAI, Anthropic, Google, Cohere
-- **Model Settings**: Default models, temperature, max tokens
-- **Application Settings**: Environment, log level, paths
-- **Advanced RAG**: Top-K retrieval, chunk size/overlap, reranking enablement
-- **Vector Store**: ChromaDB configuration
-- **Security**: Rate limiting, timeouts, retries
+**LLM & Model Settings:**
+- **Cloud API Keys**: OpenAI, Anthropic, Google, Cohere (optional)
+- **Ollama Settings**: Base URL, chat model, embedding model
+- **Model Defaults**: Default models, temperature, max tokens
+
+**Ollama Configuration (Local Models):**
+```bash
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_CHAT_MODEL=gemma3:4b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+```
+
+**Application Settings:**
+- Environment, log level, paths
+- Vector Store: ChromaDB configuration
+- Security: Rate limiting, timeouts, retries
+- Advanced RAG: Top-K retrieval, chunk size/overlap, reranking
 
 ### Project Settings
 
@@ -327,9 +409,12 @@ This project is licensed under the MIT License.
 ## 🙏 Acknowledgments
 
 - Built with [uv](https://github.com/astral-sh/uv) - An extremely fast Python package installer
+- Local model support powered by [Ollama](https://ollama.ai/) - Run LLMs locally
+- RAG pipeline built with [LangChain](https://www.langchain.com/) - Framework for LLM applications
 - Uses [Pydantic](https://docs.pydantic.dev/) for settings management
 - Logging powered by [Loguru](https://github.com/Delgan/loguru)
 - Beautiful terminal output with [Rich](https://github.com/Textualize/rich)
+- Web UI built with [Gradio](https://www.gradio.app/) - Fast web interfaces for ML
 
 ---
 
