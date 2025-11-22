@@ -202,10 +202,54 @@ class AIWorkdeskUI:
         Returns:
             Tuple of (updated chat history, empty string for message box)
         """
-        # Placeholder - implement actual chat logic
-        history.append({"role": "user", "content": message})
-        history.append({"role": "assistant", "content": "This is a placeholder response. Implement actual chat logic here."})
-        return history, ""
+        if not message.strip():
+            return history, ""
+        
+        try:
+            # Add user message to history
+            history.append({"role": "user", "content": message})
+            
+            # Initialize Ollama client with selected model or default
+            # Extract model name if it's in format like "gpt-4o" or use as-is
+            ollama_model = self.settings.ollama_chat_model
+            
+            # Check if user selected a specific model
+            if model and not model.startswith("gpt"):
+                # Assume it's an Ollama model
+                ollama_model = model
+            
+            # Create Ollama client
+            client = OllamaClient(model=ollama_model)
+            
+            # Build conversation context from history
+            conversation = ""
+            if system_prompt:
+                conversation = f"System: {system_prompt}\n\n"
+            
+            # Add recent history (last 5 exchanges to keep context manageable)
+            recent_history = history[-10:] if len(history) > 10 else history
+            for msg in recent_history[:-1]:  # Exclude the last message (current user message)
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                conversation += f"{role.capitalize()}: {content}\n"
+            
+            # Add current message
+            conversation += f"User: {message}\nAssistant:"
+            
+            # Get response from Ollama
+            logger.info(f"Sending message to Ollama model: {ollama_model}")
+            response = client.chat(conversation)
+            
+            # Add assistant response to history
+            history.append({"role": "assistant", "content": response})
+            
+            return history, ""
+            
+        except Exception as e:
+            logger.error(f"Chat error: {e}")
+            error_msg = f"Error: {str(e)}"
+            history.append({"role": "assistant", "content": error_msg})
+            return history, ""
 
     def create_interface(self) -> "gr.Blocks":
         custom_css = """
