@@ -148,6 +148,38 @@ p, span, label {
 .sidebar-spacer {
     flex-grow: 1;
 }
+
+/* Button Active States */
+.primary-btn:active, .secondary-btn:active {
+    background: #6366f1 !important;
+    color: white !important;
+    transform: scale(0.98);
+}
+
+/* Title Fix - Bring to Front */
+h1, h2 {
+    position: relative;
+    z-index: 100 !important;
+    background: white;
+    padding: 10px 0;
+}
+
+/* Logo Styling */
+.sidebar-logo {
+    text-align: center;
+    margin-top: 20px;
+    padding: 15px;
+}
+.sidebar-logo img {
+    width: 120px;
+    height: 120px;
+    border-radius: 20px;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    transition: transform 0.2s ease;
+}
+.sidebar-logo img:hover {
+    transform: scale(1.05);
+}
 """
 
 
@@ -290,16 +322,122 @@ class AIWorkdeskUI:
         if not message:
             return history, ""
         
-        # Placeholder for actual RAG logic
-        # In a real implementation, this would call self.vector_store.similarity_search
-        # and then self.openai_client.chat.completions.create
+        try:
+            # Step 1: Retrieve context if RAG is enabled
+            context = ""
+            if rag_technique and rag_technique.lower() != "none":
+                try:
+                    # Perform similarity search
+                    retrieved_docs = self.vector_store.similarity_search(
+                        query=message,
+                        k=int(top_k),
+                        score_threshold=float(similarity_threshold)
+                    )
+                    
+                    if retrieved_docs:
+                        # Format context from retrieved documents
+                        context_parts = []
+                        for i, doc in enumerate(retrieved_docs, 1):
+                            context_parts.append(f"[Document {i}]\n{doc.page_content}\n")
+                        context = "\n".join(context_parts)
+                        logger.info(f"Retrieved {len(retrieved_docs)} documents for RAG")
+                    else:
+                        logger.info("No documents retrieved from vector store")
+                except Exception as e:
+                    logger.error(f"Error during retrieval: {e}")
+                    context = ""
+            
+            # Step 2: Construct the prompt
+            if context:
+                full_prompt = f"""{system_prompt}
+
+Context from knowledge base:
+{context}
+
+User question: {message}
+
+Please answer based on the context provided above."""
+            else:
+                full_prompt = f"{system_prompt}\n\nUser: {message}"
+            
+            # Step 3: Select and call the appropriate LLM
+            response = ""
+            if model.lower().startswith("gpt"):
+                # Use OpenAI
+                if not self.openai_client:
+                    response = "❌ OpenAI client not initialized. Please check your API key in .env"
+                else:
+                    try:
+                        completion = self.openai_client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": full_prompt}
+                            ],
+                            temperature=float(temperature),
+                            max_tokens=int(max_tokens)
+                        )
+                        response = completion.choices[0].message.content
+                    except Exception as e:
+                        logger.error(f"OpenAI error: {e}")
+                        response = f"❌ OpenAI Error: {str(e)}"
+            else:
+                # Use Ollama
+                try:
+                    ollama_client = OllamaClient(
+                        model=model,
+                        temperature=float(temperature),
+                        max_tokens=int(max_tokens)
+                    )
+                    response = ollama_client.chat(full_prompt)
+                except Exception as e:
+                    logger.error(f"Ollama error: {e}")
+                    response = f"❌ Ollama Error: {str(e)}\n\nMake sure Ollama is running and the model '{model}' is available."
+            
+            # Step 4: Update history
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": response})
+            return history, ""
+            
+        except Exception as e:
+            logger.error(f"Chat error: {e}")
+            error_msg = f"❌ Error: {str(e)}"
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": error_msg})
+            return history, ""
+
+    def export_chat(self, history):
+        """Export chat history to a Markdown file."""
+        import tempfile
+        from datetime import datetime
         
-        response = f"**Echo**: {message}\n\n*Model*: {model}\n*RAG*: {rag_technique}\n*Database*: {database}"
+        if not history:
+            return None
         
-        # Append to history (Gradio 'messages' type uses list of dicts)
-        history.append({"role": "user", "content": message})
-        history.append({"role": "assistant", "content": response})
-        return history, ""
+        # Generate markdown content
+        md_lines = [
+            "# AI Workdesk Chat Export",
+            f"\n**Exported**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
+            "---\n"
+        ]
+        
+        for msg in history:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            
+            if role == "user":
+                md_lines.append(f"## 👤 User\n\n{content}\n")
+            elif role == "assistant":
+                md_lines.append(f"## 🤖 Assistant\n\n{content}\n")
+        
+        # Write to temp file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+            f.write("\n".join(md_lines))
+            temp_path = f.name
+        
+        logger.info(f"Chat exported to {temp_path}")
+        return temp_path
+
 
     def create_interface(self) -> gr.Blocks:
         """Create the Gradio interface."""
@@ -316,8 +454,15 @@ class AIWorkdeskUI:
                     workdesk_btn = gr.Button("🛠️ Work Desk", variant="secondary", elem_classes=["secondary-btn"])
                     about_btn = gr.Button("ℹ️ About", variant="secondary", elem_classes=["secondary-btn"])
                     
-                    # Spacer to push logout to bottom
+                    # Spacer to push content to bottom
                     gr.HTML("<div style='flex-grow: 1; min-height: 200px;'></div>")
+                    
+                    # Logo at bottom
+                    gr.HTML("""
+                    <div class="sidebar-logo">
+                        <img src="file/C:/Users/Riemann/.gemini/antigravity/brain/ed76ab05-ecf5-4566-9275-b5d96abc1da1/ai_workdesk_logo_1763825780435.png" alt="AI Workdesk Logo">
+                    </div>
+                    """)
                     
                     gr.Markdown("---")
                     
@@ -417,9 +562,15 @@ class AIWorkdeskUI:
                                             send_btn = gr.Button("Send 📤", scale=1, variant="primary", elem_classes=["primary-btn"])
 
                                         with gr.Row():
-                                            clear_btn = gr.Button(
-                                                "🗑️ Clear Chat", variant="secondary", scale=1, elem_classes=["secondary-btn"]
-                                            )
+                                            with gr.Column(scale=1):
+                                                clear_btn = gr.Button(
+                                                    "🗑️ Clear Chat", variant="secondary", elem_classes=["secondary-btn"]
+                                                )
+                                            with gr.Column(scale=1):
+                                                download_btn = gr.Button("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
+                                        
+                                        # Hidden file output for download
+                                        download_file = gr.File(label="Download", visible=False)
 
                                     with gr.Column(scale=2, elem_classes=["glass-panel"]):
                                         model_dropdown = gr.Dropdown(
@@ -562,9 +713,15 @@ class AIWorkdeskUI:
                                 system_prompt,
                             ],
                             [chatbot, msg],
-                        )
+                        )\
 
                         clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
+                        download_btn.click(
+                            self.export_chat,
+                            inputs=[chatbot],
+                            outputs=[download_file]
+                        )
+
 
                     # About Page
                     with gr.Group(visible=False) as about_page:
