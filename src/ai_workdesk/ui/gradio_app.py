@@ -226,10 +226,17 @@ class AIWorkdeskUI:
                 context = "No relevant documents found in the knowledge base."
                 logger.warning("No documents retrieved from vector store")
             
-            # Step 3: Determine which model to use
-            ollama_model = self.settings.ollama_chat_model
-            if model and not model.startswith("gpt"):
-                ollama_model = model
+            # Step 3: Determine which model to use and which client
+            is_openai_model = model and model.startswith("gpt")
+            
+            if is_openai_model:
+                # Use OpenAI for GPT models
+                model_name = model
+                model_display = f"OpenAI {model}"
+            else:
+                # Use Ollama for local models
+                model_name = model if model and not model.startswith("gpt") else self.settings.ollama_chat_model
+                model_display = model_name
             
             # Step 4: Build RAG prompt
             rag_prompt = ""
@@ -251,20 +258,33 @@ Instructions:
 - If the context doesn't contain enough information, say so
 - Be concise and accurate
 - Cite specific parts of the context when relevant
-{"- IMPORTANT: Start your response by introducing yourself with: 'Hello! I am " + ollama_model + ", ready to help you with your questions based on the knowledge base.'" if is_first_message else ""}
+{"- IMPORTANT: Start your response by introducing yourself with: 'Hello! I am " + model_display + ", ready to help you with your questions based on the knowledge base.'" if is_first_message else ""}
 
 Answer:"""
             
-            # Step 5: Initialize Ollama client with parameters
-            client = OllamaClient(
-                model=ollama_model,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
+            # Step 5: Get response using appropriate client
+            logger.info(f"Generating RAG response with model: {model_display}")
             
-            # Step 5: Get RAG response
-            logger.info(f"Generating RAG response with model: {ollama_model}")
-            response = client.chat(rag_prompt)
+            if is_openai_model:
+                # Use OpenAI client
+                if not self.openai_client:
+                    raise ValueError("OpenAI API key not configured. Please set OPENAI_API_KEY in .env file.")
+                
+                response_obj = self.openai_client.chat.completions.create(
+                    model=model_name,
+                    messages=[{"role": "user", "content": rag_prompt}],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                response = response_obj.choices[0].message.content
+            else:
+                # Use Ollama client
+                client = OllamaClient(
+                    model=model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                response = client.chat(rag_prompt)
             
             # Add assistant response to history
             history.append({"role": "assistant", "content": response})
