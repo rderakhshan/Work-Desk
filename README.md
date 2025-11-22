@@ -2,18 +2,6 @@
 
 A professional Python workdesk for developing and utilizing various AI tools. Built with modern best practices using `uv` for ultra-fast dependency management.
 
-## ✨ Features
-
-- 🏗️ **Modern Project Structure**: Follows Python src layout best practices
-- ⚡ **Ultra-Fast Setup**: Powered by `uv` - 10-100x faster than pip
-- 🔐 **Secure Authentication**: Environment-based API key management
-- 📦 **Modular Design**: Organized tools for LLMs, embeddings, RAG, and vision
-- � **Local Model Support**: Integrated Ollama for running models locally (Gemma, Llama, etc.)
-- �🧪 **Ready for Testing**: Pre-configured pytest, ruff, and mypy
-- 📝 **Type-Safe**: Full type hints with mypy validation
-- 🎨 **Beautiful Console**: Rich terminal output with loguru logging
-- 🖥️ **Modern UI**: Gradio-based web interface with glassmorphism design
-- 🔍 **Advanced RAG**: Support for Naive, Hybrid, Contextual, and Graph RAG
 - ⚙️ **Granular Control**: Advanced settings for Top-K, Chunk Size, Overlap, and Reranking
 - 🧪 **Engineering Labs**: Dedicated tabs for **Embedding** (Ingestion) and **Chat** (Retrieval)
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
@@ -99,7 +87,7 @@ uv run ai-workdesk-ui
 # Download and install Ollama from https://ollama.ai/
 
 # Pull recommended models
-ollama pull gemma3:4b          # Chat model
+ollama pull deepseek-r1:7b      # Chat model (reasoning)
 ollama pull nomic-embed-text   # Embedding model
 ```
 
@@ -120,7 +108,7 @@ DEFAULT_TEMPERATURE=0.7
 
 # Ollama Configuration (for local models)
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=gemma3:4b
+OLLAMA_CHAT_MODEL=deepseek-r1:7b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
@@ -131,13 +119,13 @@ For complete privacy and offline usage, use Ollama without any API keys:
 1. **Install Ollama**: Download from [ollama.ai](https://ollama.ai/)
 2. **Pull Models**:
    ```bash
-   ollama pull gemma3:4b          # Fast chat model
+   ollama pull deepseek-r1:7b     # Reasoning chat model
    ollama pull nomic-embed-text   # Embedding model
    ```
 3. **Configure `.env`**:
    ```bash
    OLLAMA_BASE_URL=http://localhost:11434
-   OLLAMA_CHAT_MODEL=gemma3:4b
+   OLLAMA_CHAT_MODEL=deepseek-r1:7b
    OLLAMA_EMBEDDING_MODEL=nomic-embed-text
    ```
 
@@ -257,7 +245,7 @@ Interact with your documents using advanced RAG techniques:
 **Basic Settings:**
 - **Model Selection**: 
   - **Cloud**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo
-  - **Local (Ollama)**: Gemma3:4b, Llama 3, Mistral, and more
+  - **Local (Ollama)**: DeepSeek-R1:7b, Llama 3, Mistral, and more
 - **RAG Technique**: Naive RAG, Hybrid Search, Contextual RAG, Graph RAG
 - **Embedding Model**: Ollama (default), OpenAI, HuggingFace, Google Gemini
 - **Database**: ChromaDB, FAISS, PGVector, SQLite, Pinecone
@@ -317,7 +305,7 @@ logger.info("AI Workdesk initialized!")
 ```python
 from ai_workdesk.tools.llm.ollama_client import OllamaClient
 
-# Initialize with default model from .env (gemma3:4b)
+# Initialize with default model from .env (deepseek-r1:7b)
 client = OllamaClient()
 
 # Chat with the model
@@ -367,7 +355,7 @@ See `.env.example` for all available options:
 **Ollama Configuration (Local Models):**
 ```bash
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=gemma3:4b
+OLLAMA_CHAT_MODEL=deepseek-r1:7b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 ```
 
