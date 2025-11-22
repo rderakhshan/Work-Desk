@@ -231,6 +231,9 @@ class AIWorkdeskUI:
             if system_prompt:
                 rag_prompt += f"System Instructions: {system_prompt}\n\n"
             
+            # Check if this is the first message (empty history except current user message)
+            is_first_message = len(history) <= 1
+            
             rag_prompt += f"""You are a helpful AI assistant. Answer the user's question based on the following context from the knowledge base.
 
 Context from Knowledge Base:
@@ -243,6 +246,7 @@ Instructions:
 - If the context doesn't contain enough information, say so
 - Be concise and accurate
 - Cite specific parts of the context when relevant
+{"- IMPORTANT: Start your response by introducing yourself with: 'Hello! I am " + ollama_model + ", ready to help you with your questions based on the knowledge base.'" if is_first_message else ""}
 
 Answer:"""
             
