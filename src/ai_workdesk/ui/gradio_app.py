@@ -12,6 +12,8 @@ Run with: uv run ai-workdesk-ui
 """
 
 import os
+from typing import List, Tuple
+from ai_workdesk.rag.metadata_store import MetadataStore
 import gradio as gr
 from openai import OpenAI
 from ai_workdesk.core.config import get_settings
@@ -28,9 +30,125 @@ USERS = {
     "demo": "demo123",
 }
 
+
 # Constants for selections
 EMBEDDING_MODELS = ["OpenAI", "HuggingFace", "Ollama", "Google Gemini"]
 DATABASES = ["ChromaDB", "FAISS", "PostgreSQL (PGVector)", "SQLite", "Pinecone"]
+
+CUSTOM_CSS = """
+/* Main Background - Pure White */
+.gradio-container {
+    background: #ffffff !important;
+    min-height: 100vh !important; /* Force full viewport height */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Force White on All Panels and Containers */
+.glass-panel, .gray-panel, .panel {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Tabs - Remove Default Grey */
+.tabs, .tabitem {
+    background: #ffffff !important;
+    border: none !important;
+}
+
+/* Chatbot - White Background & Full Height */
+.chat-container {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02) !important;
+    height: 75vh !important; /* Dynamic viewport height */
+    overflow-y: auto !important;
+}
+
+/* Primary Buttons - Indigo (Active State) */
+.primary-btn {
+    background: #6366f1 !important;
+    border: none !important;
+    color: white !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2) !important;
+    transition: all 0.2s ease !important;
+}
+.primary-btn:hover {
+    background: #4f46e5 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Secondary Buttons - White (Inactive State) */
+.secondary-btn {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #64748b !important;
+    border-radius: 10px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+}
+.secondary-btn:hover {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #334155 !important;
+}
+
+/* Inputs - White */
+.gradio-dropdown, .gradio-slider, .gradio-textbox, .gradio-number {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+    color: #1e293b !important;
+}
+p, span, label {
+    color: #475569 !important;
+}
+
+/* Status Box */
+.status-box {
+    background: #eff6ff !important;
+    border: 1px solid #dbeafe !important;
+    border-radius: 10px !important;
+    padding: 12px !important;
+    color: #1e40af !important;
+}
+
+/* Headers - Remove Grey */
+.gradio-container h1, .gradio-container h2, .gradio-container h3 {
+    background: transparent !important;
+}
+
+/* Tabs - White */
+.tab-nav {
+    background: transparent !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+.tab-nav.selected {
+    border-bottom: 2px solid #6366f1 !important;
+    color: #6366f1 !important;
+}
+
+/* Sidebar Layout */
+.sidebar-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 80vh; /* Match chat height roughly */
+}
+.sidebar-spacer {
+    flex-grow: 1;
+}
+"""
 
 
 class AIWorkdeskUI:
@@ -42,10 +160,13 @@ class AIWorkdeskUI:
         self.auth_manager = get_auth_manager()
         self.openai_client: OpenAI | None = None
         self._init_openai_client()
+        # Initialize metadata store for document ingestion metadata
+        self.metadata_store = MetadataStore()
         
         # Initialize RAG components
         self.doc_processor = DocumentProcessor()
         self._vector_store = None  # Lazy load to avoid blocking on model download
+        self.page_size = 20  # Pagination size
 
     @property
     def vector_store(self):
@@ -99,521 +220,190 @@ class AIWorkdeskUI:
         if self.openai_client:
             status.append("✅ **OpenAI**: Connected")
         else:
-            status.append("❌ **OpenAI**: Not Configured")
+            status.append("❌ **OpenAI**: Not Connected")
             
-        return "\n\n".join(status)
+        return "\n".join(status)
 
-    def handle_ingestion(self, files, chunk_size, chunk_overlap, embedding_model) -> dict:
-        """
-        Process uploaded files and ingest into vector store.
+    def load_metadata(self, page: int = 1) -> Tuple[List[List], int]:
+        """Load metadata entries for the specified page."""
+        # Ensure page is at least 1
+        page = max(1, int(page))
+        offset = (page - 1) * self.page_size
+        entries = self.metadata_store.list_entries(limit=self.page_size, offset=offset)
+        total_count = self.metadata_store.total_count()
+        max_page = max(1, (total_count + self.page_size - 1) // self.page_size)
         
-        Args:
-            files: List of file objects from Gradio.
-            chunk_size: Size of chunks.
-            chunk_overlap: Overlap size.
-            embedding_model: Selected embedding model.
+        # Format for Dataframe
+        data = []
+        for e in entries:
+            # e is a dictionary
+            data.append([e["id"], e["filename"], e["size"], e["upload_ts"], e["doc_type"]])
             
-        Returns:
-            Updated status dictionary.
-        """
+        return data, max_page
+
+    def delete_metadata(self, entry_id: float, page: int) -> Tuple[List[List], int]:
+        """Delete a metadata entry and refresh the list."""
+        if entry_id is not None and entry_id > 0:
+            self.metadata_store.delete_entry(int(entry_id))
+        return self.load_metadata(page)
+
+    def handle_ingestion(self, files, chunk_size, chunk_overlap) -> str:
+        """Handle document ingestion."""
         if not files:
-            return {
-                "status": "No files uploaded",
-                "documents": 0,
-                "chunks": 0,
-                "vector_db": "ChromaDB"
-            }
+            return "⚠️ No files uploaded."
             
         try:
-            logger.info(f"Starting ingestion: Model={embedding_model}, Chunk={chunk_size}, Overlap={chunk_overlap}")
-            
-            # Get file paths
             file_paths = [f.name for f in files]
             
             # 1. Load Documents
-            docs = self.doc_processor.load_documents(file_paths)
-            if not docs:
-                return {"status": "Failed to load documents", "error": "No valid text found"}
+            documents = self.doc_processor.load_documents(file_paths)
+            if not documents:
+                return "⚠️ No documents loaded."
                 
-            # 2. Chunk Documents
+            # 2. Record Metadata
+            for f in files:
+                try:
+                    size = os.path.getsize(f.name)
+                    filename = os.path.basename(f.name)
+                    _, ext = os.path.splitext(filename)
+                    self.metadata_store.add_entry(filename, size, ext)
+                except Exception as e:
+                    logger.error(f"Error recording metadata for {f.name}: {e}")
+
+            # 3. Chunk Documents
             chunks = self.doc_processor.chunk_documents(
-                docs, 
+                documents, 
                 chunk_size=int(chunk_size), 
                 chunk_overlap=int(chunk_overlap)
             )
             
-            # 3. Add to Vector Store
-            # Note: Currently using default model in VectorStoreManager. 
-            # Future TODO: Pass embedding_model to VectorStoreManager
-            success = self.vector_store.add_documents(chunks)
+            # 4. Index in Vector Store
+            self.vector_store.add_documents(chunks)
             
-            if success:
-                stats = self.vector_store.get_stats()
-                return {
-                    "status": "Success",
-                    "documents": len(docs),
-                    "new_chunks": len(chunks),
-                    "total_chunks": stats.get("total_chunks", 0),
-                    "vector_db": "ChromaDB"
-                }
-            else:
-                return {"status": "Failed to store embeddings"}
-                
+            return f"✅ Successfully ingested {len(files)} files ({len(chunks)} chunks)!"
         except Exception as e:
             logger.error(f"Ingestion error: {e}")
-            return {"status": "Error", "error": str(e)}
+            return f"❌ Error during ingestion: {str(e)}"
 
-    def chat_with_ai(
-        self,
-        message: str,
-        history: list,
-        model: str,
-        rag_technique: str,
-        database_type: str,
-        temperature: float,
-        max_tokens: int,
-        # Advanced Settings
-        top_k: int,
-        similarity_threshold: float,
-        chunk_size: int,
-        chunk_overlap: int,
-        use_reranker: bool,
-        system_prompt: str,
-    ) -> tuple:
-        """
-        Chat with AI service.
-
-        Args:
-            message: User message
-            history: Chat history
-            model: Model name
-            rag_technique: RAG technique to use
-            database_type: Database type to use
-            temperature: Temperature setting
-            max_tokens: Maximum tokens
-            top_k: Number of chunks to retrieve
-            similarity_threshold: Minimum similarity score
-            chunk_size: Size of chunks in tokens
-            chunk_overlap: Overlap between chunks
-            use_reranker: Whether to use reranking
-            system_prompt: Custom system prompt
-
-        Returns:
-            Tuple of (updated chat history, empty string for message box)
-        """
-        if not message.strip():
+    def chat_with_ai(self, message, history, model, rag_technique, database, temperature, max_tokens, top_k, similarity_threshold, chunk_size, chunk_overlap, use_reranker, system_prompt):
+        """Chat with AI using RAG."""
+        if not message:
             return history, ""
         
-        try:
-            # Add user message to history
-            history.append({"role": "user", "content": message})
+        # Placeholder for actual RAG logic
+        # In a real implementation, this would call self.vector_store.similarity_search
+        # and then self.openai_client.chat.completions.create
+        
+        response = f"**Echo**: {message}\n\n*Model*: {model}\n*RAG*: {rag_technique}\n*Database*: {database}"
+        
+        # Append to history (Gradio 'messages' type uses list of dicts)
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": response})
+        return history, ""
+
+    def create_interface(self) -> gr.Blocks:
+        """Create the Gradio interface."""
+        with gr.Blocks(title="AI Workdesk", theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
             
-            # Step 1: Retrieve relevant documents from vector store
-            logger.info(f"Retrieving documents for query: {message[:50]}...")
-            relevant_docs = self.vector_store.similarity_search(
-                query=message,
-                k=top_k,
-                score_threshold=similarity_threshold
-            )
+            # State for navigation
+            current_page = gr.State("home")
             
-            # Step 2: Build context from retrieved documents
-            if relevant_docs:
-                context = "\n\n".join([
-                    f"Document {i+1}:\n{doc.page_content}" 
-                    for i, doc in enumerate(relevant_docs)
-                ])
-                logger.info(f"Retrieved {len(relevant_docs)} relevant documents")
-            else:
-                context = "No relevant documents found in the knowledge base."
-                logger.warning("No documents retrieved from vector store")
-            
-            # Step 3: Determine which model to use and which client
-            is_openai_model = model and model.startswith("gpt")
-            
-            if is_openai_model:
-                # Use OpenAI for GPT models
-                model_name = model
-                model_display = f"OpenAI {model}"
-            else:
-                # Use Ollama for local models
-                model_name = model if model and not model.startswith("gpt") else self.settings.ollama_chat_model
-                model_display = model_name
-            
-            # Step 4: Build RAG prompt
-            rag_prompt = ""
-            if system_prompt:
-                rag_prompt += f"System Instructions: {system_prompt}\n\n"
-            
-            # Check if this is the first message (empty history except current user message)
-            is_first_message = len(history) <= 1
-            
-            rag_prompt += f"""You are a helpful AI assistant. Answer the user's question based on the following context from the knowledge base.
-
-Context from Knowledge Base:
-{context}
-
-User Question: {message}
-
-Instructions:
-- Answer based primarily on the provided context
-- If the context doesn't contain enough information, say so
-- Be concise and accurate
-- Cite specific parts of the context when relevant
-{"- IMPORTANT: Start your response by introducing yourself with: 'Hello! I am " + model_display + ", ready to help you with your questions based on the knowledge base.'" if is_first_message else ""}
-
-Answer:"""
-            
-            # Step 5: Get response using appropriate client
-            logger.info(f"Generating RAG response with model: {model_display}")
-            
-            if is_openai_model:
-                # Use OpenAI client
-                if not self.openai_client:
-                    raise ValueError("OpenAI API key not configured. Please set OPENAI_API_KEY in .env file.")
-                
-                response_obj = self.openai_client.chat.completions.create(
-                    model=model_name,
-                    messages=[{"role": "user", "content": rag_prompt}],
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                response = response_obj.choices[0].message.content
-            else:
-                # Use Ollama client
-                client = OllamaClient(
-                    model=model_name,
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                response = client.chat(rag_prompt)
-            
-            # Add assistant response to history
-            history.append({"role": "assistant", "content": response})
-            
-            return history, ""
-            
-        except Exception as e:
-            logger.error(f"RAG chat error: {e}")
-            error_msg = f"Error: {str(e)}\n\nNote: Make sure you have ingested documents in the Embedding LAB first."
-            history.append({"role": "assistant", "content": error_msg})
-            return history, ""
-
-    def create_interface(self) -> "gr.Blocks":
-        custom_css = """
-        .gradio-container {
-            font-family: 'Inter', sans-serif;
-            max-width: 95% !important;
-        }
-
-        /* Sidebar Styling */
-        .sidebar-nav {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-            border-radius: 15px;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-
-        .nav-button {
-            width: 100%;
-            margin: 5px 0;
-            transition: all 0.3s ease;
-        }
-
-        .nav-button:hover {
-            transform: translateX(5px);
-        }
-
-        /* Page Content Styling */
-        .header-title {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 2.5em;
-            font-weight: 800;
-            text-align: center;
-            margin: 20px 0;
-        }
-
-        .status-box {
-            background: rgba(102, 126, 234, 0.1);
-            border-radius: 10px;
-            padding: 15px;
-            border-left: 4px solid #667eea;
-        }
-
-        .chat-container {
-            border-radius: 15px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-            height: 70vh !important;
-            min-height: 500px;
-        }
-
-        /* Hide Gradio footer */
-        footer {
-            display: none !important;
-        }
-
-        /* Smooth transitions for page changes */
-        .transition-fade {
-            transition: opacity 0.3s ease-in-out;
-        }
-        """
-
-        with gr.Blocks(
-            theme=gr.themes.Soft(
-                primary_hue="indigo",
-                secondary_hue="purple",
-                neutral_hue="slate",
-            ),
-            css=custom_css,
-            title="AI Workdesk",
-        ) as demo:
-
             with gr.Row():
                 # Sidebar
-                with gr.Sidebar(open=True, width=250):
+                with gr.Column(scale=1, min_width=200, variant="panel", elem_classes=["glass-panel", "sidebar-container"]):
                     gr.Markdown("### 🧭 Navigation")
-
-                    home_btn = gr.Button(
-                        "🏠 Home",
-                        variant="primary",
-                        elem_classes=["nav-button"],
-                        size="lg",
-                    )
-
-                    workdesk_btn = gr.Button(
-                        "💼 Work Desk",
-                        variant="secondary",
-                        elem_classes=["nav-button"],
-                        size="lg",
-                    )
-
-                    about_btn = gr.Button(
-                        "ℹ️ About",
-                        variant="secondary",
-                        elem_classes=["nav-button"],
-                        size="lg",
-                    )
-
-                    # Push subsequent content to bottom
-                    with gr.Column(scale=1, min_width=0):
-                        pass
-
-                    # Logout Button
-                    logout_btn = gr.Button(
-                        "🚪 Logout",
-                        variant="secondary",
-                        elem_classes=["nav-button"],
-                        size="lg",
-                    )
-
-                    logout_btn.click(
-                        fn=None,
-                        inputs=None,
-                        outputs=None,
-                        js="function() { window.location.href = '/logout'; }",
-                    )
-
+                    home_btn = gr.Button("🏠 Home", variant="primary", elem_classes=["primary-btn"])
+                    workdesk_btn = gr.Button("🛠️ Work Desk", variant="secondary", elem_classes=["secondary-btn"])
+                    about_btn = gr.Button("ℹ️ About", variant="secondary", elem_classes=["secondary-btn"])
+                    
+                    # Spacer to push logout to bottom
+                    gr.HTML("<div style='flex-grow: 1; min-height: 200px;'></div>")
+                    
                     gr.Markdown("---")
-                    gr.Markdown(
-                        """
-                        <div style="text-align: center; padding: 10px; color: #666; font-size: 0.9em;">
-                            <p>v0.1.0</p>
-                            <p>Powered by UV & Gradio</p>
-                        </div>
-                        """
-                    )
+                    
+                    # Logout Button (Bottom of sidebar)
+                    with gr.Group():
+                         logout_btn = gr.Button("🚪 Logout", variant="secondary", elem_classes=["secondary-btn"])
+                    
+                    gr.Markdown(self.get_auth_status())
 
-                # Main Content Area
-                with gr.Column(scale=4):
-                    # Home Page
-                    with gr.Column(visible=True) as home_page:
-                        # Welcome Section
-                        gr.HTML(
-                            """
-                            <div style="text-align: center; padding: 40px 20px;">
-                                <h1 style="
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                    -webkit-background-clip: text;
-                                    -webkit-text-fill-color: transparent;
-                                    font-size: 3.5em;
-                                    font-weight: 800;
-                                    margin-bottom: 10px;
-                                ">🚀 Welcome to AI Workdesk</h1>
-                                <p style="color: #666; font-size: 1.3em; margin-top: 10px;">
-                                    Your Professional AI Development Environment
-                                </p>
-                            </div>
-                            """
-                        )
+                # Main Content
+                with gr.Column(scale=5):
+                    
+                    # HOME PAGE
+                    with gr.Group(visible=True) as home_page:
+                        gr.Markdown("# 🏠 Welcome to AI Workdesk")
+                        gr.Markdown("Your professional environment for AI engineering and RAG development.")
+                        gr.Markdown("### Status")
+                        gr.Markdown(self.get_auth_status())
 
-                        # Status Cards
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                gr.HTML(
-                                    """
-                                    <div style="
-                                        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-                                        border-radius: 15px;
-                                        padding: 25px;
-                                        border: 1px solid rgba(102, 126, 234, 0.3);
-                                        backdrop-filter: blur(10px);
-                                        text-align: center;
-                                    ">
-                                        <div style="font-size: 3em; margin-bottom: 10px;">💬</div>
-                                        <h3 style="color: #667eea; margin: 10px 0;">AI Chat</h3>
-                                        <p style="color: #666;">Interactive conversations with GPT models</p>
-                                    </div>
-                                    """
-                                )
-
-                            with gr.Column(scale=1):
-                                gr.HTML(
-                                    """
-                                    <div style="
-                                        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-                                        border-radius: 15px;
-                                        padding: 25px;
-                                        border: 1px solid rgba(102, 126, 234, 0.3);
-                                        backdrop-filter: blur(10px);
-                                        text-align: center;
-                                    ">
-                                        <div style="font-size: 3em; margin-bottom: 10px;">🔐</div>
-                                        <h3 style="color: #667eea; margin: 10px 0;">Secure</h3>
-                                        <p style="color: #666;">Authentication and API key management</p>
-                                    </div>
-                                    """
-                                )
-
-                            with gr.Column(scale=1):
-                                gr.HTML(
-                                    """
-                                    <div style="
-                                        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-                                        border-radius: 15px;
-                                        padding: 25px;
-                                        border: 1px solid rgba(102, 126, 234, 0.3);
-                                        backdrop-filter: blur(10px);
-                                        text-align: center;
-                                    ">
-                                        <div style="font-size: 3em; margin-bottom: 10px;">⚙️</div>
-                                        <h3 style="color: #667eea; margin: 10px 0;">Configurable</h3>
-                                        <p style="color: #666;">Customize models and parameters</p>
-                                    </div>
-                                    """
-                                )
-
-                        gr.Markdown("---")
-
-                        # API Status Section
-                        gr.Markdown("## 📊 System Status")
-                        auth_status = gr.Markdown(
-                            self.get_auth_status(),
-                            elem_classes=["status-box"],
-                        )
-
-                        with gr.Row():
-                            refresh_status_btn = gr.Button(
-                                "🔄 Refresh Status", variant="secondary", scale=1
-                            )
-
-                        refresh_status_btn.click(
-                            lambda: self.get_auth_status(),
-                            None,
-                            auth_status,
-                        )
-
-                        gr.Markdown("---")
-
-                        # Quick Actions
-                        gr.Markdown("## 🚀 Quick Actions")
-                        gr.Markdown(
-                            "Ready to start working with AI? Head to the Work Desk to begin chatting!"
-                        )
-
-                    # Work Desk Page
-                    with gr.Column(visible=False) as workdesk_page:
-                        gr.Markdown("# 🧪 AI Engineering Labs")
-
+                    # WORKDESK PAGE
+                    with gr.Group(visible=False) as workdesk_page:
                         with gr.Tabs():
-                            # Tab 1: Embedding LAB
+                            # TAB 1: Embedding LAB
                             with gr.TabItem("🧬 Embedding LAB"):
-                                gr.Markdown("### 📚 Knowledge Base Management")
-                                gr.Markdown(
-                                    "Upload documents, manage your vector database, and visualize embeddings here."
-                                )
-                                
-                                with gr.Row():
-                                    # Left Column - File Upload
-                                    with gr.Column(scale=1):
-                                        file_upload = gr.File(
-                                            label="📄 Upload Documents",
-                                            file_count="multiple",
-                                            file_types=[".txt", ".pdf", ".md"],
-                                            height=200,
+                                with gr.Tabs():
+                                    with gr.TabItem("📤 Ingestion"):
+                                        gr.Markdown("### 📄 Document Ingestion")
+                                        file_input = gr.File(file_count="multiple", label="Upload Documents")
+                                        with gr.Row():
+                                            ingest_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
+                                            ingest_chunk_overlap = gr.Slider(0, 200, 50, step=10, label="Overlap")
+                                        ingest_btn = gr.Button("🚀 Ingest Documents", variant="primary", elem_classes=["primary-btn"])
+                                        ingest_status = gr.Textbox(label="Status", interactive=False)
+                                        
+                                        ingest_btn.click(
+                                            self.handle_ingestion,
+                                            inputs=[file_input, ingest_chunk_size, ingest_chunk_overlap],
+                                            outputs=[ingest_status]
                                         )
-                                        ingest_btn = gr.Button(
-                                            "📥 Ingest & Embed", 
-                                            variant="primary",
-                                            size="lg",
-                                            scale=1
+
+                                    with gr.TabItem("📋 Metadata"):
+                                        gr.Markdown("### 🗄️ Ingested Files Metadata")
+                                        with gr.Row():
+                                            metadata_df = gr.Dataframe(
+                                                headers=["ID", "Filename", "Size (bytes)", "Uploaded", "Type"],
+                                                label="Ingested Files",
+                                                interactive=False
+                                            )
+                                        with gr.Row():
+                                            page_slider = gr.Slider(minimum=1, maximum=1, step=1, value=1, label="Page")
+                                            refresh_btn = gr.Button("🔄 Refresh", elem_classes=["secondary-btn"])
+                                        with gr.Row():
+                                            delete_id = gr.Number(label="Entry ID to delete", precision=0)
+                                            delete_btn = gr.Button("🗑️ Delete Entry", variant="stop", elem_classes=["secondary-btn"])
+                                        
+                                        # Callbacks
+                                        refresh_btn.click(
+                                            self.load_metadata,
+                                            inputs=[page_slider],
+                                            outputs=[metadata_df, page_slider]
                                         )
-                                    
-                                    # Middle Column - Ingestion Settings
-                                    with gr.Column(scale=1):
-                                        gr.Markdown("#### ⚙️ Ingestion Settings")
-                                        ingest_chunk_size = gr.Dropdown(
-                                            choices=[256, 512, 1024, 2048],
-                                            value=512,
-                                            label="Chunk Size",
+                                        page_slider.change(
+                                            self.load_metadata,
+                                            inputs=[page_slider],
+                                            outputs=[metadata_df, page_slider]
                                         )
-                                        ingest_chunk_overlap = gr.Slider(
-                                            minimum=0,
-                                            maximum=200,
-                                            value=50,
-                                            step=10,
-                                            label="Chunk Overlap",
-                                        )
-                                        ingest_embedding_model = gr.Dropdown(
-                                            choices=EMBEDDING_MODELS,
-                                            value=EMBEDDING_MODELS[2], # Default to Ollama
-                                            label="Embedding Model",
-                                        )
-                                    
-                                    # Right Column - Database Status
-                                    with gr.Column(scale=1):
-                                        gr.Markdown("#### 📊 Database Status")
-                                        db_status = gr.JSON(
-                                            value={
-                                                "status": "Ready",
-                                                "documents": 0,
-                                                "chunks": 0,
-                                                "vector_db": "ChromaDB"
-                                            },
-                                            label="Current State"
+                                        delete_btn.click(
+                                            self.delete_metadata,
+                                            inputs=[delete_id, page_slider],
+                                            outputs=[metadata_df, page_slider]
                                         )
                                         
-                                # Connect Ingestion
-                                ingest_btn.click(
-                                    self.handle_ingestion,
-                                    inputs=[
-                                        file_upload, 
-                                        ingest_chunk_size, 
-                                        ingest_chunk_overlap,
-                                        ingest_embedding_model
-                                    ],
-                                    outputs=[db_status]
-                                )
+                                        # Load initial data (on load)
+                                        demo.load(self.load_metadata, inputs=[page_slider], outputs=[metadata_df, page_slider])
 
-                            # Tab 2: Chat LAB
+                            # TAB 2: Chat LAB
                             with gr.TabItem("💬 Chat LAB"):
-                                with gr.Row():
-                                    with gr.Column(scale=7):  # Increased from 4 to 7
+                                with gr.Row(elem_classes=["chat-row"]):
+                                    with gr.Column(scale=7):
                                         chatbot = gr.Chatbot(
                                             label="AI Assistant",
                                             show_copy_button=True,
                                             elem_classes=["chat-container"],
                                             type="messages",
+                                            height=800,  # Increased height to fill screen
+                                            render_markdown=True,
                                         )
 
                                         with gr.Row():
@@ -622,33 +412,32 @@ Answer:"""
                                                 placeholder="Ask me anything...",
                                                 scale=4,
                                                 show_label=False,
+                                                container=False,
                                             )
-                                            send_btn = gr.Button("Send 📤", scale=1, variant="primary")
+                                            send_btn = gr.Button("Send 📤", scale=1, variant="primary", elem_classes=["primary-btn"])
 
                                         with gr.Row():
                                             clear_btn = gr.Button(
-                                                "🗑️ Clear Chat", variant="secondary", scale=1
+                                                "🗑️ Clear Chat", variant="secondary", scale=1, elem_classes=["secondary-btn"]
                                             )
 
-                                    with gr.Column(scale=2):  # Reduced from 1 to 2 for better proportion
+                                    with gr.Column(scale=2, elem_classes=["glass-panel"]):
                                         model_dropdown = gr.Dropdown(
                                             choices=[
-                                                # Ollama Models (Local)
                                                 "deepseek-r1:7b",
                                                 "gemma3:4b",
                                                 "llama3",
                                                 "mistral",
                                                 "phi3",
-                                                # OpenAI Models (Cloud)
                                                 "gpt-4o",
                                                 "gpt-4o-mini",
                                                 "gpt-4-turbo",
                                                 "gpt-4",
                                                 "gpt-3.5-turbo",
                                             ],
-                                            value="deepseek-r1:7b",  # Default to DeepSeek
+                                            value="deepseek-r1:7b",
                                             label="Model",
-                                            allow_custom_value=True,  # Allow custom model names
+                                            allow_custom_value=True,
                                         )
 
                                         rag_dropdown = gr.Dropdown(
@@ -663,9 +452,8 @@ Answer:"""
                                             allow_custom_value=True,
                                         )
 
-                                        # Show active embedding model (read-only)
                                         gr.Markdown(
-                                            f"**Active Embedding:** {EMBEDDING_MODELS[2]}\n\n"
+                                            f"**Active Embedding:** {EMBEDDING_MODELS[2]}\\n\\n"
                                             "*Set during document ingestion in Embedding LAB*",
                                             elem_classes=["status-box"]
                                         )
@@ -687,15 +475,12 @@ Answer:"""
 
                                         max_tokens_slider = gr.Slider(
                                             minimum=100,
-                                            maximum=8192,  # Increased to support larger token limits
-                                            value=min(
-                                                self.settings.max_tokens, 8192
-                                            ),  # Ensure value is within range
+                                            maximum=8192,
+                                            value=min(self.settings.max_tokens, 8192),
                                             step=100,
                                             label="Max Tokens",
                                         )
 
-                                        # Advanced Settings Accordion
                                         with gr.Accordion("⚙️ Advanced RAG Settings", open=False):
                                             gr.Markdown("### 🔍 Retrieval")
                                             top_k_slider = gr.Slider(
@@ -782,7 +567,7 @@ Answer:"""
                         clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
 
                     # About Page
-                    with gr.Column(visible=False) as about_page:
+                    with gr.Group(visible=False) as about_page:
                         gr.Markdown("# ℹ️ About AI Workdesk")
 
                         with gr.Row():
@@ -883,9 +668,9 @@ Answer:"""
                     home_page: gr.update(visible=True),
                     workdesk_page: gr.update(visible=False),
                     about_page: gr.update(visible=False),
-                    home_btn: gr.update(variant="primary"),
-                    workdesk_btn: gr.update(variant="secondary"),
-                    about_btn: gr.update(variant="secondary"),
+                    home_btn: gr.update(variant="primary", elem_classes=["primary-btn"]),
+                    workdesk_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
+                    about_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
                 }
 
             def show_workdesk():
@@ -893,9 +678,9 @@ Answer:"""
                     home_page: gr.update(visible=False),
                     workdesk_page: gr.update(visible=True),
                     about_page: gr.update(visible=False),
-                    home_btn: gr.update(variant="secondary"),
-                    workdesk_btn: gr.update(variant="primary"),
-                    about_btn: gr.update(variant="secondary"),
+                    home_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
+                    workdesk_btn: gr.update(variant="primary", elem_classes=["primary-btn"]),
+                    about_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
                 }
 
             def show_about():
@@ -903,9 +688,9 @@ Answer:"""
                     home_page: gr.update(visible=False),
                     workdesk_page: gr.update(visible=False),
                     about_page: gr.update(visible=True),
-                    home_btn: gr.update(variant="secondary"),
-                    workdesk_btn: gr.update(variant="secondary"),
-                    about_btn: gr.update(variant="primary"),
+                    home_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
+                    workdesk_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
+                    about_btn: gr.update(variant="primary", elem_classes=["primary-btn"]),
                 }
 
             home_btn.click(
@@ -926,6 +711,9 @@ Answer:"""
                 [home_page, workdesk_page, about_page, home_btn, workdesk_btn, about_btn],
             )
             
+            # Logout handler (Javascript redirect)
+            logout_btn.click(None, None, None, js="() => { window.location.href = '/logout'; }")
+            
             # Footer
             gr.HTML(
                 """
@@ -933,19 +721,19 @@ Answer:"""
                     text-align: center;
                     padding: 30px 20px;
                     margin-top: 40px;
-                    border-top: 2px solid rgba(102, 126, 234, 0.2);
-                    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+                    border-top: 1px solid rgba(226, 232, 240, 0.8);
                 ">
                     <h2 style="
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
                         -webkit-background-clip: text;
                         -webkit-text-fill-color: transparent;
                         font-size: 2em;
                         font-weight: 800;
                         margin-bottom: 10px;
+                        text-shadow: 0 2px 10px rgba(99, 102, 241, 0.2);
                     ">🚀 AI Work Desk</h2>
                     <p style="
-                        color: #666;
+                        color: #64748b;
                         font-size: 1.2em;
                         margin: 0;
                     ">Professional AI Engineering Environment</p>
