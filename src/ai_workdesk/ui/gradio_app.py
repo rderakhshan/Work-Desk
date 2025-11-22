@@ -226,7 +226,12 @@ class AIWorkdeskUI:
                 context = "No relevant documents found in the knowledge base."
                 logger.warning("No documents retrieved from vector store")
             
-            # Step 3: Build RAG prompt
+            # Step 3: Determine which model to use
+            ollama_model = self.settings.ollama_chat_model
+            if model and not model.startswith("gpt"):
+                ollama_model = model
+            
+            # Step 4: Build RAG prompt
             rag_prompt = ""
             if system_prompt:
                 rag_prompt += f"System Instructions: {system_prompt}\n\n"
@@ -250,11 +255,7 @@ Instructions:
 
 Answer:"""
             
-            # Step 4: Initialize Ollama client with parameters
-            ollama_model = self.settings.ollama_chat_model
-            if model and not model.startswith("gpt"):
-                ollama_model = model
-            
+            # Step 5: Initialize Ollama client with parameters
             client = OllamaClient(
                 model=ollama_model,
                 temperature=temperature,
