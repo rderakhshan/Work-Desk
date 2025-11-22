@@ -12,6 +12,8 @@ Run with: uv run ai-workdesk-ui
 """
 
 import os
+import gradio as gr
+from openai import OpenAI
 from ai_workdesk.core.config import get_settings
 from ai_workdesk.tools.llm.ollama_client import OllamaClient
 from loguru import logger
