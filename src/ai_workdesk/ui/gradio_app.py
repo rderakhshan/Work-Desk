@@ -587,7 +587,7 @@ Answer:"""
                             # Tab 2: Chat LAB
                             with gr.TabItem("💬 Chat LAB"):
                                 with gr.Row():
-                                    with gr.Column(scale=4):
+                                    with gr.Column(scale=7):  # Increased from 4 to 7
                                         chatbot = gr.Chatbot(
                                             label="AI Assistant",
                                             show_copy_button=True,
@@ -609,7 +609,7 @@ Answer:"""
                                                 "🗑️ Clear Chat", variant="secondary", scale=1
                                             )
 
-                                    with gr.Column(scale=1):
+                                    with gr.Column(scale=2):  # Reduced from 1 to 2 for better proportion
                                         model_dropdown = gr.Dropdown(
                                             choices=[
                                                 # Ollama Models (Local)
