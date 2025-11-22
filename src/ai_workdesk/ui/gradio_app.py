@@ -591,6 +591,7 @@ class AIWorkdeskUI:
                                         model_dropdown = gr.Dropdown(
                                             choices=[
                                                 # Ollama Models (Local)
+                                                "deepseek-r1:7b",
                                                 "gemma3:4b",
                                                 "llama3",
                                                 "mistral",
@@ -602,7 +603,7 @@ class AIWorkdeskUI:
                                                 "gpt-4",
                                                 "gpt-3.5-turbo",
                                             ],
-                                            value="gemma3:4b",  # Default to Ollama
+                                            value="deepseek-r1:7b",  # Default to DeepSeek
                                             label="Model",
                                             allow_custom_value=True,  # Allow custom model names
                                         )
