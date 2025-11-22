@@ -59,7 +59,10 @@ class VectorStoreManager:
             if not chunks:
                 return False
             self.vector_store.add_documents(documents=chunks)
-            logger.info(f"Added {len(chunks)} chunks to vector store")
+            # Log collection stats
+            collection = self.client.get_collection(self.collection_name)
+            count = collection.count()
+            logger.info(f"Added {len(chunks)} chunks. Total documents in collection: {count}")
             return True
         except Exception as e:
             logger.error(f"Error adding documents to vector store: {e}")
@@ -94,16 +97,32 @@ class VectorStoreManager:
             List of relevant Document chunks.
         """
         try:
+            # Check collection stats first
+            collection = self.client.get_collection(self.collection_name)
+            total_docs = collection.count()
+            logger.info(f"Searching in collection with {total_docs} total documents")
+            
+            if total_docs == 0:
+                logger.warning("Collection is EMPTY! No documents to search.")
+                return []
+            
             # Use similarity_search_with_score to get scores
             results_with_scores = self.vector_store.similarity_search_with_score(query, k=k)
             
-            # Filter by threshold and extract documents
+            # ChromaDB returns L2 distance (lower is better: 0 = perfect match)
+            # Convert similarity threshold (0-1, higher is better) to max distance
+            # For threshold 0.7, we want distance <= 0.3
+            max_distance = 1.0 - score_threshold
+            
             filtered_docs = [
-                doc for doc, score in results_with_scores 
-                if score >= score_threshold
+                doc for doc, distance in results_with_scores 
+                if distance <= max_distance
             ]
             
-            logger.info(f"Retrieved {len(filtered_docs)} documents for query (threshold: {score_threshold})")
+            logger.info(f"Retrieved {len(filtered_docs)}/{len(results_with_scores)} documents (threshold: {score_threshold}, max_distance: {max_distance:.2f})")
+            if len(filtered_docs) == 0 and len(results_with_scores) > 0:
+                distances = [f"{d:.3f}" for _, d in results_with_scores[:3]]
+                logger.warning(f"All results filtered out! Top 3 distances: {distances}. Try lowering similarity_threshold (current: {score_threshold})")
             return filtered_docs
         except Exception as e:
             logger.error(f"Error during similarity search: {e}")

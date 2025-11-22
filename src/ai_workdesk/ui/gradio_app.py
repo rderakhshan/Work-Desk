@@ -35,6 +35,12 @@ USERS = {
 EMBEDDING_MODELS = ["OpenAI", "HuggingFace", "Ollama", "Google Gemini"]
 DATABASES = ["ChromaDB", "FAISS", "PostgreSQL (PGVector)", "SQLite", "Pinecone"]
 
+# Provider-based model lists
+MODELS = {
+    "OpenAI": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"],
+    "Ollama": ["deepseek-r1:7b", "gemma3:4b", "llama3", "mistral", "phi3"]
+}
+
 CUSTOM_CSS = """
 /* Main Background - Pure White */
 .gradio-container {
@@ -329,26 +335,95 @@ class AIWorkdeskUI:
             return history, ""
         
         try:
-            # Step 1: Retrieve context if RAG is enabled
+            # Step 1: Retrieve context based on RAG technique
             context = ""
-            if rag_technique and rag_technique.lower() != "none":
+            if rag_technique and rag_technique.lower() not in ["none", ""]:
                 try:
-                    # Perform similarity search
-                    retrieved_docs = self.vector_store.similarity_search(
-                        query=message,
-                        k=int(top_k),
-                        score_threshold=float(similarity_threshold)
-                    )
+                    if "naive" in rag_technique.lower():
+                        # Naive RAG: Direct retrieval
+                        retrieved_docs = self.vector_store.similarity_search(
+                            query=message,
+                            k=int(top_k),
+                            score_threshold=float(similarity_threshold)
+                        )
+                        
+                    elif "hyde" in rag_technique.lower() or "hypothetical" in rag_technique.lower():
+                        # HyDE: Generate hypothetical answer first, use for retrieval
+                        logger.info("Using HyDE technique")
+                        # Generate hypothesis
+                        hypothesis_prompt = f"Generate a hypothetical answer to: {message}"
+                        try:
+                            if model.lower().startswith("gpt") and self.openai_client:
+                                hyp_completion = self.openai_client.chat.completions.create(
+                                    model=model,
+                                    messages=[{"role": "user", "content": hypothesis_prompt}],
+                                    temperature=0.7,
+                                    max_tokens=200
+                                )
+                                hypothesis = hyp_completion.choices[0].message.content
+                            else:
+                                ollama_hyp = OllamaClient(model=model, temperature=0.7, max_tokens=200)
+                                hypothesis = ollama_hyp.chat(hypothesis_prompt)
+                            
+                            # Use hypothesis for retrieval
+                            retrieved_docs = self.vector_store.similarity_search(
+                                query=hypothesis,
+                                k=int(top_k),
+                                score_threshold=float(similarity_threshold)
+                            )
+                        except Exception as e:
+                            logger.error(f"HyDE hypothesis generation failed: {e}, falling back to naive")
+                            retrieved_docs = self.vector_store.similarity_search(
+                                query=message,
+                                k=int(top_k),
+                                score_threshold=float(similarity_threshold)
+                            )
+                    
+                    elif "fusion" in rag_technique.lower():
+                        # RAG Fusion: Multiple query variations
+                        logger.info("Using RAG Fusion technique")
+                        query_variations = [
+                            message,
+                            f"What is {message}?",
+                            f"Explain {message}"
+                        ]
+                        all_docs = []
+                        for query in query_variations:
+                            docs = self.vector_store.similarity_search(
+                                query=query,
+                                k=int(top_k) // len(query_variations) + 1,
+                                score_threshold=float(similarity_threshold)
+                            )
+                            all_docs.extend(docs)
+                        
+                        # Remove duplicates and limit
+                        seen = set()
+                        retrieved_docs = []
+                        for doc in all_docs:
+                            if doc.page_content not in seen:
+                                seen.add(doc.page_content)
+                                retrieved_docs.append(doc)
+                                if len(retrieved_docs) >= int(top_k):
+                                    break
+                    
+                    else:
+                        # Default to naive RAG
+                        retrieved_docs = self.vector_store.similarity_search(
+                            query=message,
+                            k=int(top_k),
+                            score_threshold=float(similarity_threshold)
+                        )
                     
                     if retrieved_docs:
-                        # Format context from retrieved documents
+                        # Format context
                         context_parts = []
                         for i, doc in enumerate(retrieved_docs, 1):
                             context_parts.append(f"[Document {i}]\n{doc.page_content}\n")
                         context = "\n".join(context_parts)
-                        logger.info(f"Retrieved {len(retrieved_docs)} documents for RAG")
+                        logger.info(f"Retrieved {len(retrieved_docs)} documents using {rag_technique}")
                     else:
-                        logger.info("No documents retrieved from vector store")
+                        logger.info("No documents retrieved")
+                        
                 except Exception as e:
                     logger.error(f"Error during retrieval: {e}")
                     context = ""
@@ -595,23 +670,18 @@ Please answer based on the context provided above."""
                                                     "🗑️ Clear Chat", variant="secondary", elem_classes=["secondary-btn"]
                                                 )
                                             with gr.Column(scale=1):
-                                                download_btn = gr.DownloadButton("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
+                                                download_btn = gr.Button("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
 
 
                                     with gr.Column(scale=2, elem_classes=["glass-panel"]):
+                                        provider_dropdown = gr.Dropdown(
+                                            choices=["Ollama", "OpenAI"],
+                                            value="Ollama",
+                                            label="Provider",
+                                        )
+                                        
                                         model_dropdown = gr.Dropdown(
-                                            choices=[
-                                                "deepseek-r1:7b",
-                                                "gemma3:4b",
-                                                "llama3",
-                                                "mistral",
-                                                "phi3",
-                                                "gpt-4o",
-                                                "gpt-4o-mini",
-                                                "gpt-4-turbo",
-                                                "gpt-4",
-                                                "gpt-3.5-turbo",
-                                            ],
+                                            choices=MODELS["Ollama"],
                                             value="deepseek-r1:7b",
                                             label="Model",
                                             allow_custom_value=True,
@@ -620,13 +690,12 @@ Please answer based on the context provided above."""
                                         rag_dropdown = gr.Dropdown(
                                             choices=[
                                                 "Naive RAG",
-                                                "Hybrid Search",
-                                                "Contextual RAG",
-                                                "Graph RAG",
+                                                "HyDE (Hypothetical Document Embeddings)",
+                                                "RAG Fusion",
+                                                "None",
                                             ],
                                             value="Naive RAG",
                                             label="RAG Technique",
-                                            allow_custom_value=True,
                                         )
 
                                         gr.Markdown(
@@ -739,12 +808,65 @@ Please answer based on the context provided above."""
                                 system_prompt,
                             ],
                             [chatbot, msg],
-                        )\
+                        )
+
+                        # Provider change updates model list
+                        def update_models(provider):
+                            models = MODELS.get(provider, MODELS["Ollama"])
+                            return gr.update(choices=models, value=models[0])
+                        
+                        provider_dropdown.change(
+                            update_models,
+                            inputs=[provider_dropdown],
+                            outputs=[model_dropdown]
+                        )
 
                         clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
+                        
+                        # Download with JavaScript to trigger browser Save As dialog
                         download_btn.click(
-                            self.export_chat,
-                            inputs=[chatbot]
+                            None,
+                            inputs=[chatbot],
+                            outputs=None,
+                            js="""(history) => {
+                                if (!history || history.length === 0) {
+                                    alert('No chat history to export');
+                                    return;
+                                }
+                                
+                                // Generate markdown content
+                                let md = '# AI Workdesk Chat Export\\n\\n';
+                                md += `**Exported**: ${new Date().toLocaleString()}\\n\\n`;
+                                md += '---\\n\\n';
+                                
+                                history.forEach(msg => {
+                                    if (msg.role === 'user') {
+                                        md += `## 👤 User\\n\\n${msg.content}\\n\\n`;
+                                    } else if (msg.role === 'assistant') {
+                                        md += `## 🤖 Assistant\\n\\n${msg.content}\\n\\n`;
+                                    }
+                                });
+                                
+                                // Create blob and trigger download with Save As dialog
+                                const blob = new Blob([md], {type: 'text/markdown;charset=utf-8'});
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                
+                                // Generate filename with timestamp
+                                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                                a.download = `ai_workdesk_chat_${timestamp}.md`;
+                                
+                                // Trigger download
+                                document.body.appendChild(a);
+                                a.click();
+                                
+                                // Cleanup
+                                setTimeout(() => {
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                }, 100);
+                            }"""
                         )
 
 
