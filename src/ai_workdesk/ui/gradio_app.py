@@ -168,7 +168,6 @@ class AIWorkdeskUI:
         history: list,
         model: str,
         rag_technique: str,
-        embedding_model: str,
         database_type: str,
         temperature: float,
         max_tokens: int,
@@ -188,7 +187,6 @@ class AIWorkdeskUI:
             history: Chat history
             model: Model name
             rag_technique: RAG technique to use
-            embedding_model: Embedding model to use
             database_type: Database type to use
             temperature: Temperature setting
             max_tokens: Maximum tokens
@@ -639,11 +637,11 @@ Answer:"""
                                             allow_custom_value=True,
                                         )
 
-                                        embedding_dropdown = gr.Dropdown(
-                                            choices=EMBEDDING_MODELS,
-                                            value=EMBEDDING_MODELS[0],
-                                            label="Embedding Model",
-                                            allow_custom_value=True,
+                                        # Show active embedding model (read-only)
+                                        gr.Markdown(
+                                            f"**Active Embedding:** {EMBEDDING_MODELS[2]}\n\n"
+                                            "*Set during document ingestion in Embedding LAB*",
+                                            elem_classes=["status-box"]
                                         )
 
                                         database_dropdown = gr.Dropdown(
@@ -722,7 +720,6 @@ Answer:"""
                                 chatbot,
                                 model_dropdown,
                                 rag_dropdown,
-                                embedding_dropdown,
                                 database_dropdown,
                                 temperature_slider,
                                 max_tokens_slider,
@@ -743,7 +740,6 @@ Answer:"""
                                 chatbot,
                                 model_dropdown,
                                 rag_dropdown,
-                                embedding_dropdown,
                                 database_dropdown,
                                 temperature_slider,
                                 max_tokens_slider,
