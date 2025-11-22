@@ -156,23 +156,29 @@ p, span, label {
     transform: scale(0.98);
 }
 
-/* Title Fix - Bring to Front */
+/* Title Fix - Bring to Front with Maximum Specificity */
+.gradio-container h1,
+.gradio-container h2,
 h1, h2 {
-    position: relative;
-    z-index: 100 !important;
-    background: white;
-    padding: 10px 0;
+    position: relative !important;
+    z-index: 1000 !important;
+    background: white !important;
+    padding: 10px 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
-/* Logo Styling */
+/* Logo Styling - 80% Sidebar Width */
 .sidebar-logo {
     text-align: center;
     margin-top: 20px;
     padding: 15px;
+    width: 100%;
 }
 .sidebar-logo img {
-    width: 120px;
-    height: 120px;
+    width: 80% !important;
+    height: auto !important;
+    max-width: 180px;
     border-radius: 20px;
     box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
     transition: transform 0.2s ease;
@@ -407,9 +413,10 @@ Please answer based on the context provided above."""
             return history, ""
 
     def export_chat(self, history):
-        """Export chat history to a Markdown file."""
-        import tempfile
+        """Export chat history to a Markdown file in Downloads folder."""
+        import os
         from datetime import datetime
+        from pathlib import Path
         
         if not history:
             return None
@@ -430,13 +437,18 @@ Please answer based on the context provided above."""
             elif role == "assistant":
                 md_lines.append(f"## 🤖 Assistant\n\n{content}\n")
         
-        # Write to temp file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
-            f.write("\n".join(md_lines))
-            temp_path = f.name
+        # Save to Downloads folder with timestamp
+        downloads_path = Path.home() / "Downloads"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"ai_workdesk_chat_{timestamp}.md"
+        file_path = downloads_path / filename
         
-        logger.info(f"Chat exported to {temp_path}")
-        return temp_path
+        # Write file
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write("\n".join(md_lines))
+        
+        logger.info(f"Chat exported to {file_path}")
+        return str(file_path)
 
 
     def create_interface(self) -> gr.Blocks:
@@ -457,20 +469,36 @@ Please answer based on the context provided above."""
                     # Spacer to push content to bottom
                     gr.HTML("<div style='flex-grow: 1; min-height: 200px;'></div>")
                     
-                    # Logo at bottom
-                    gr.HTML("""
-                    <div class="sidebar-logo">
-                        <img src="file/C:/Users/Riemann/.gemini/antigravity/brain/ed76ab05-ecf5-4566-9275-b5d96abc1da1/ai_workdesk_logo_1763825780435.png" alt="AI Workdesk Logo">
-                    </div>
-                    """)
-                    
                     gr.Markdown("---")
                     
-                    # Logout Button (Bottom of sidebar)
+                    # Logout Button
                     with gr.Group():
                          logout_btn = gr.Button("🚪 Logout", variant="secondary", elem_classes=["secondary-btn"])
                     
                     gr.Markdown(self.get_auth_status())
+                    
+                    # Logo at very bottom (below status)
+                    gr.HTML("""
+                    <div class="sidebar-logo">
+                        <svg width="100%" height="auto" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <rect width="200" height="200" rx="30" fill="url(#logoGrad)"/>
+                            <circle cx="100" cy="70" r="25" fill="white" opacity="0.9"/>
+                            <circle cx="70" cy="120" r="15" fill="white" opacity="0.7"/>
+                            <circle cx="130" cy="120" r="15" fill="white" opacity="0.7"/>
+                            <circle cx="100" cy="150" r="10" fill="white" opacity="0.5"/>
+                            <line x1="100" y1="70" x2="70" y2="120" stroke="white" stroke-width="3" opacity="0.6"/>
+                            <line x1="100" y1="70" x2="130" y2="120" stroke="white" stroke-width="3" opacity="0.6"/>
+                            <line x1="70" y1="120" x2="100" y2="150" stroke="white" stroke-width="2" opacity="0.4"/>
+                            <line x1="130" y1="120" x2="100" y2="150" stroke="white" stroke-width="2" opacity="0.4"/>
+                        </svg>
+                    </div>
+                    """)
 
                 # Main Content
                 with gr.Column(scale=5):
@@ -567,10 +595,8 @@ Please answer based on the context provided above."""
                                                     "🗑️ Clear Chat", variant="secondary", elem_classes=["secondary-btn"]
                                                 )
                                             with gr.Column(scale=1):
-                                                download_btn = gr.Button("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
-                                        
-                                        # Hidden file output for download
-                                        download_file = gr.File(label="Download", visible=False)
+                                                download_btn = gr.DownloadButton("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
+
 
                                     with gr.Column(scale=2, elem_classes=["glass-panel"]):
                                         model_dropdown = gr.Dropdown(
@@ -718,9 +744,9 @@ Please answer based on the context provided above."""
                         clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
                         download_btn.click(
                             self.export_chat,
-                            inputs=[chatbot],
-                            outputs=[download_file]
+                            inputs=[chatbot]
                         )
+
 
 
                     # About Page
