@@ -7,6 +7,25 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
 - 🌐 **Flexible Providers**: Support for OpenAI, HuggingFace, Ollama, and Google Gemini embeddings
 
+## 🆕 Recent Updates (November 22, 2025)
+
+### RAG Enhancements
+- ✅ **Multiple RAG Techniques**: Naive RAG, HyDE (Hypothetical Document Embeddings), and RAG Fusion
+- ✅ **Provider-Based Model Selection**: Dynamic filtering of models based on provider (OpenAI/Ollama)
+- ✅ **Source Citations**: Automatic references to documents used in AI responses
+- ✅ **Improved Retrieval**: Enhanced logging and threshold handling for ChromaDB distance metrics
+
+### UI/UX Improvements
+- ✅ **Download Fix**: Chat export now triggers browser "Save As" dialog for custom save location
+- ✅ **Metadata Deduplication**: Shows only unique documents (most recent version) in Metadata tab
+- ✅ **Logo Display**: Fixed sidebar logo to show actual brain-on-desk image
+- ✅ **Consistent Styling**: Metadata tab now matches Ingestion tab's clean design
+
+### Vector Store Improvements
+- ✅ **Collection Stats**: Real-time document count logging
+- ✅ **Better Error Messages**: Shows actual distances when retrieval fails
+- ✅ **Threshold Guidance**: Recommends optimal similarity threshold values (0.3-0.4 for ChromaDB)
+
 ## 📁 Project Structure
 
 ```
@@ -242,19 +261,29 @@ The system will:
 
 Interact with your documents using advanced RAG techniques:
 
-**Basic Settings:**
-- **Model Selection**: 
-  - **Cloud**: GPT-4o, GPT-4o-mini, GPT-4-turbo, GPT-3.5-turbo
-  - **Local (Ollama)**: DeepSeek-R1:7b, Llama 3, Mistral, and more
-- **RAG Technique**: Naive RAG, Hybrid Search, Contextual RAG, Graph RAG
-- **Embedding Model**: Ollama (default), OpenAI, HuggingFace, Google Gemini
-- **Database**: ChromaDB, FAISS, PGVector, SQLite, Pinecone
+**Provider-Based Model Selection:**
+- **Provider Dropdown**: Choose between OpenAI or Ollama
+- **Dynamic Model Filtering**: Model list updates based on selected provider
+  - **OpenAI**: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-4, gpt-3.5-turbo
+  - **Ollama**: deepseek-r1:7b, gemma3:4b, llama3, mistral, phi3
+
+**RAG Techniques** (Choose your retrieval strategy):
+- **Naive RAG**: Direct similarity search (fastest, good for most cases)
+- **HyDE (Hypothetical Document Embeddings)**: Generates hypothesis first for better semantic matching
+- **RAG Fusion**: Uses multiple query variations and merges results for comprehensive retrieval
+- **None**: Chat without document retrieval
+
+**Chat Features:**
+- **Source Citations**: Automatically shows which documents were used in the response
+- **Export Chat**: Download conversation history as Markdown with browser "Save As" dialog
 - **Temperature**: 0.0 (focused) to 2.0 (creative)
 - **Max Tokens**: Up to 8192 tokens
 
 **Advanced RAG Settings:**
 - **Top-K Retrieval**: Number of chunks to retrieve (1-20)
 - **Similarity Threshold**: Minimum similarity score (0.0-1.0)
+  - **Recommended**: 0.3-0.4 for ChromaDB (uses distance metric)
+  - Lower values = more permissive retrieval
 - **Chunk Size**: Token size for document chunks
 - **Chunk Overlap**: Overlap between consecutive chunks
 - **Reranker**: Enable/disable result reranking
