@@ -11,7 +11,7 @@ class MetadataStore:
     and a simple document type derived from the file extension.
     """
 
-    def __init__(self, db_path: str = "metadata.db"):
+    def __init__(self, db_path: str = "data/metadata.db"):
         self.db_path = db_path
         self._ensure_db()
 

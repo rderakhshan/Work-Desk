@@ -2,7 +2,17 @@ import os
 from typing import List, Dict, Any
 from pathlib import Path
 from loguru import logger
-from langchain_community.document_loaders import TextLoader, PyPDFLoader, UnstructuredMarkdownLoader
+from langchain_community.document_loaders import (
+    TextLoader, 
+    PyPDFLoader, 
+    UnstructuredMarkdownLoader,
+    Docx2txtLoader,
+    CSVLoader,
+    JSONLoader,
+    UnstructuredHTMLLoader,
+    UnstructuredPowerPointLoader,
+    UnstructuredExcelLoader
+)
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
@@ -14,6 +24,14 @@ class DocumentProcessor:
             ".txt": TextLoader,
             ".pdf": PyPDFLoader,
             ".md": UnstructuredMarkdownLoader,
+            ".docx": Docx2txtLoader,
+            ".csv": CSVLoader,
+            ".json": JSONLoader,
+            ".html": UnstructuredHTMLLoader,
+            ".htm": UnstructuredHTMLLoader,
+            ".pptx": UnstructuredPowerPointLoader,
+            ".xlsx": UnstructuredExcelLoader,
+            ".xls": UnstructuredExcelLoader,
         }
 
     def load_documents(self, file_paths: List[str]) -> List[Document]:

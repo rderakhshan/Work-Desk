@@ -26,6 +26,15 @@ dependencies = [
     "tenacity>=8.0.0", # Retry logic
     "gradio>=5.0.0",
     "langchain-ollama>=1.0.0",
+    "unstructured>=0.18.20",
+    "markdown>=3.10",
+    "feedparser>=6.0.0",
+    "openai>=2.8.1",
+    "langchain-community>=0.0.10",
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
+    "langchain-huggingface>=0.0.1",
+    "langchain-chroma>=0.1.0",
 ]
 
 # Optional dependency groups for different AI tools
@@ -39,13 +48,14 @@ llm = [
     "langchain-anthropic>=0.3.0",
     "tiktoken>=0.8.0",
     "pypdf>=4.0.0",
-    "langchain-community>=0.0.10",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.3.0",
+    "tiktoken>=0.8.0",
+    "pypdf>=4.0.0",
 ]
 
 # Embeddings and vector stores
 embeddings = [
-    "sentence-transformers>=2.2.0",
-    "chromadb>=0.4.0",
     "faiss-cpu>=1.7.0",
 ]
 

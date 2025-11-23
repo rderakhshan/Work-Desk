@@ -2,24 +2,28 @@
 
 A professional Python workdesk for developing and utilizing various AI tools. Built with modern best practices using `uv` for ultra-fast dependency management.
 
+## ✨ Key Features
+
+- 🏠 **Smart Homepage**: Full-width glassmorphism dashboard with AI-powered insights
 - ⚙️ **Granular Control**: Advanced settings for Top-K, Chunk Size, Overlap, and Reranking
 - 🧪 **Engineering Labs**: Dedicated tabs for **Embedding** (Ingestion) and **Chat** (Retrieval)
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
 - 🌐 **Flexible Providers**: Support for OpenAI, HuggingFace, Ollama, and Google Gemini embeddings
+- 💬 **Context-Aware Chat**: Chat with your dashboard items using selected AI models
 
 ## 🆕 Recent Updates (November 22, 2025)
 
-### RAG Enhancements
-- ✅ **Multiple RAG Techniques**: Naive RAG, HyDE (Hypothetical Document Embeddings), and RAG Fusion
-- ✅ **Provider-Based Model Selection**: Dynamic filtering of models based on provider (OpenAI/Ollama)
-- ✅ **Source Citations**: Automatic references to documents used in AI responses
-- ✅ **Improved Retrieval**: Enhanced logging and threshold handling for ChromaDB distance metrics
+### 🏠 Smart Homepage ("Project Ambitions")
+- ✅ **Full-Width Glassmorphism UI**: Modern, asymmetrical 65/35 split layout
+- ✅ **Time & Weather Widget**: Live clock and weather display at top right
+- ✅ **Smart Feed**: Timeline-style feed combining emails, news, videos, and trends
+- ✅ **Clickable Items**: All dashboard items link to their original sources
+- ✅ **Context-Aware AI Chat**: Chat with dashboard items using Ollama or OpenAI
+- ✅ **Default Model**: DeepSeek-R1:7b for intelligent reasoning
+- ✅ **Floating Stats**: Real-time urgency scores and item counts
+- ✅ **Quick Actions**: One-click access to common tasks
 
-### UI/UX Improvements
-- ✅ **Download Fix**: Chat export now triggers browser "Save As" dialog for custom save location
-- ✅ **Metadata Deduplication**: Shows only unique documents (most recent version) in Metadata tab
-- ✅ **Logo Display**: Fixed sidebar logo to show actual brain-on-desk image
-- ✅ **Consistent Styling**: Metadata tab now matches Ingestion tab's clean design
+### RAG Enhancements
 
 ### Vector Store Improvements
 - ✅ **Collection Stats**: Real-time document count logging
@@ -38,9 +42,21 @@ ai-workdesk/
 │       │   └── logger.py     # Logging setup
 │       ├── rag/              # RAG pipeline
 │       │   ├── ingestion.py  # Document processing & chunking
-│       │   └── vector_store.py # Vector database management
+│       │   ├── vector_store.py # Vector database management
+│       │   └── metadata_store.py # Document metadata tracking
+│       ├── smart_dashboard/  # Smart Homepage
+│       │   ├── ui.py         # Dashboard UI components
+│       │   ├── data_engine.py # Data aggregation
+│       │   ├── ai_processor.py # AI chat integration
+│       │   ├── models.py     # Data models
+│       │   └── fetchers/     # Data source fetchers
+│       │       ├── email_fetcher.py
+│       │       ├── rss_fetcher.py
+│       │       ├── youtube_fetcher.py
+│       │       └── trends_fetcher.py
 │       ├── ui/               # User interfaces
-│       │   └── gradio_app.py # Gradio web interface
+│       │   ├── gradio_app.py # Gradio web interface
+│       │   └── assets/       # UI assets (logo, etc.)
 │       ├── tools/            # AI tools collection
 │       │   ├── llm/         # LLM tools
 │       │   │   └── ollama_client.py # Ollama local model wrapper
@@ -49,19 +65,10 @@ ai-workdesk/
 │       │   └── vision/      # Vision tools
 │       └── utils/           # Shared utilities
 ├── docs/                    # Documentation
-│   ├── IMPLEMENTATION_PLAN_OLLAMA.md # Ollama integration plan
-│   ├── QUICK_START.md      # Quick start guide
-│   ├── UI_GUIDE.md         # UI usage guide
-│   └── system_prompt_template.md # System prompt examples
 ├── tests/                   # Test suite
-│   ├── unit/               # Unit tests
-│   ├── integration/        # Integration tests
-│   └── manual/             # Manual test scripts
-├── notebooks/               # Jupyter notebooks
 ├── data/                    # Data directory
 │   └── chroma_db/          # ChromaDB persistent storage
-├── config/                  # Configuration files
-└── scripts/                 # Utility scripts
+└── config/                  # Configuration files
 ```
 
 ## 🚀 Quick Start
@@ -70,7 +77,7 @@ ai-workdesk/
 
 - Python 3.12+
 - `uv` installed ([Install Guide](https://docs.astral.sh/uv/getting-started/installation/))
-- **Optional**: [Ollama](https://ollama.ai/) for local model support (recommended for privacy and offline use)
+- **Recommended**: [Ollama](https://ollama.ai/) for local model support (privacy and offline use)
 
 ### Installation
 
@@ -89,7 +96,7 @@ uv sync
 # Copy the example file
 cp .env.example .env
 
-# Edit .env and add your API keys
+# Edit .env and add your API keys (optional for Ollama-only usage)
 ```
 
 4. **Run the Web UI:**
@@ -101,14 +108,65 @@ uv run ai-workdesk-ui
 - Username: `admin`
 - Password: `admin123`
 
-5. **Optional - Install Ollama for Local Models:**
+5. **Install Ollama for Local Models (Recommended):**
 ```bash
 # Download and install Ollama from https://ollama.ai/
 
 # Pull recommended models
-ollama pull deepseek-r1:7b      # Chat model (reasoning)
-ollama pull nomic-embed-text   # Embedding model
+ollama pull deepseek-r1:7b      # Chat model (reasoning) - Default for Smart Homepage
+ollama pull nomic-embed-text    # Embedding model
 ```
+
+## 🏠 Smart Homepage
+
+The Smart Homepage is your AI-powered command center, providing an intelligent overview of your digital workspace.
+
+### Features
+
+**🎨 Full-Width Glassmorphism Design**
+- Modern asymmetrical layout (65/35 split)
+- Borderless glass components with high blur effects
+- Editorial-style typography using Outfit font
+- Smooth animations and hover effects
+
+**⏰ Time & Weather Widget**
+- Live clock display
+- Current date
+- Weather icon (customizable with real API integration)
+- Located at top right for quick reference
+
+**📊 Smart Feed**
+- Timeline-style feed combining multiple sources:
+  - 📧 Email updates
+  - 📰 RSS news feeds
+  - 📺 YouTube videos
+  - 📈 Trending topics
+- All items are **clickable** and link to their original sources
+- Sorted by timestamp for latest updates first
+
+**💬 Context-Aware AI Chat**
+- Chat bar positioned at the top for easy access
+- **Default Model**: DeepSeek-R1:7b (Ollama)
+- **Provider Selection**: Switch between Ollama and OpenAI
+- **Full Context**: AI receives complete details of all dashboard items
+  - Titles, summaries, links, urgency scores, timestamps
+- Ask questions like:
+  - "Summarize the urgent items"
+  - "What are the trending topics today?"
+  - "Show me YouTube videos about AI"
+
+**📈 Floating Stats**
+- Total items count
+- Critical actions (urgency > 60)
+- Real-time updates
+
+**⚡ Quick Actions**
+- One-click buttons for common tasks
+- "Clear Inbox" and "Start Focus" modes
+
+### Customization
+
+The Smart Homepage can be extended with additional data sources by creating new fetchers in `src/ai_workdesk/smart_dashboard/fetchers/`.
 
 ## 🔐 Authentication Setup
 
@@ -150,85 +208,10 @@ For complete privacy and offline usage, use Ollama without any API keys:
 
 The system will automatically use Ollama models when configured, with no cloud API keys required.
 
-### Option 3: System Keyring (Advanced)
-
-For enhanced security with cloud APIs, use UV's keyring provider:
-
-```bash
-# Enable keyring provider
-$env:UV_KEYRING_PROVIDER="subprocess"
-
-# Or add to pyproject.toml:
-# [tool.uv]
-# keyring-provider = "subprocess"
-```
-
 ### Check Authentication Status
 
 ```bash
 uv run python -c "from ai_workdesk import get_auth_manager; get_auth_manager().display_authentication_status()"
-```
-
-## 📦 Installing Optional Dependencies
-
-The project uses optional dependency groups for different AI tools:
-
-```bash
-# Install LLM tools (OpenAI, Anthropic, LangChain, etc.)
-uv sync --extra llm
-
-# Install embedding tools
-uv sync --extra embeddings
-
-# Install vision tools
-uv sync --extra vision
-
-# Install everything
-uv sync --extra all
-
-# Install dev dependencies (already installed by default)
-uv sync --extra dev
-```
-
-## 💻 Development
-
-### Running Tests
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=ai_workdesk --cov-report=html
-
-# Run specific test file
-uv run pytest tests/unit/test_config.py
-```
-
-### Code Quality
-
-```bash
-# Format code with ruff
-uv run ruff format .
-
-# Lint code
-uv run ruff check .
-
-# Type checking with mypy
-uv run mypy src/
-```
-
-### Interactive Development
-
-```bash
-# Start IPython shell with project loaded
-uv run ipython
-
-# Start Jupyter notebook
-uv run jupyter notebook
-
-# Start Jupyter lab
-uv run jupyter lab
 ```
 
 ## 📄 Document Ingestion & RAG Pipeline
@@ -240,7 +223,7 @@ The AI Workdesk includes a complete RAG (Retrieval-Augmented Generation) pipelin
 Upload and process documents to build your knowledge base:
 
 1. **Navigate to Work Desk → Embedding LAB**
-2. **Upload Documents**: Support for `.txt`, `.pdf`, and `.md` files
+2. **Upload Documents**: Support for multiple formats (see below)
 3. **Configure Ingestion Settings**:
    - **Chunk Size**: 256, 512, 1024, or 2048 tokens
    - **Chunk Overlap**: 0-200 tokens (recommended: 50)
@@ -294,6 +277,12 @@ Interact with your documents using advanced RAG techniques:
 - **Text Files** (`.txt`): Plain text documents
 - **PDF Files** (`.pdf`): Portable Document Format
 - **Markdown** (`.md`): Markdown formatted documents
+- **Word Documents** (`.docx`): Microsoft Word files
+- **CSV Files** (`.csv`): Comma-separated values
+- **JSON Files** (`.json`): JSON data files
+- **HTML Files** (`.html`, `.htm`): Web pages
+- **PowerPoint** (`.pptx`): Microsoft PowerPoint presentations
+- **Excel Files** (`.xlsx`, `.xls`): Microsoft Excel spreadsheets
 
 ### Vector Store
 
@@ -305,31 +294,22 @@ Interact with your documents using advanced RAG techniques:
   - **OpenAI**: `text-embedding-3-small`
 - **Features**: Automatic persistence, metadata support, similarity search
 
-
 ## 📚 Usage Examples
 
-### Basic Usage
+### Using the Smart Homepage Chat
 
 ```python
-from ai_workdesk import get_settings, get_auth_manager, get_logger
+# The Smart Homepage automatically provides context to the AI
+# Just type your question in the chat bar at the top:
 
-# Get settings
-settings = get_settings()
-print(f"Environment: {settings.environment}")
-print(f"Default model: {settings.default_llm_model}")
-
-# Check authentication
-auth = get_auth_manager()
-auth.display_authentication_status()
-
-# Use logger
-logger = get_logger(__name__)
-logger.info("AI Workdesk initialized!")
+# Example queries:
+"What are my most urgent items?"
+"Summarize the trending topics"
+"Show me all YouTube videos from today"
+"What emails need immediate attention?"
 ```
 
-### Using LLM Tools
-
-**Option 1: Using Ollama (Local, Privacy-First)**
+### Using Ollama Client (Local, Privacy-First)
 
 ```python
 from ai_workdesk.tools.llm.ollama_client import OllamaClient
@@ -341,18 +321,16 @@ client = OllamaClient()
 response = client.chat("Explain quantum computing in simple terms")
 print(response)
 
-# Use a different model
-client = OllamaClient(model="llama3")
-response = client.chat("Hello!")
+# Use a different model dynamically
+response = client.chat("Hello!", model="llama3")
 print(response)
+
+# List available models
+models = client.list_models()
+print(f"Available models: {models}")
 ```
 
-**Option 2: Using OpenAI (Cloud)**
-
-```bash
-# First install LLM extras
-uv sync --extra llm
-```
+### Using OpenAI (Cloud)
 
 ```python
 from ai_workdesk.core import get_settings
@@ -394,12 +372,54 @@ OLLAMA_EMBEDDING_MODEL=nomic-embed-text
 - Security: Rate limiting, timeouts, retries
 - Advanced RAG: Top-K retrieval, chunk size/overlap, reranking
 
-### Project Settings
+## 📦 Installing Optional Dependencies
 
-Edit `pyproject.toml` for:
-- Dependencies
-- Development tools configuration (ruff, pytest, mypy)
-- Package metadata
+The project uses optional dependency groups for different AI tools:
+
+```bash
+# Install LLM tools (OpenAI, Anthropic, LangChain, etc.)
+uv sync --extra llm
+
+# Install embedding tools
+uv sync --extra embeddings
+
+# Install vision tools
+uv sync --extra vision
+
+# Install everything
+uv sync --extra all
+
+# Install dev dependencies (already installed by default)
+uv sync --extra dev
+```
+
+## 💻 Development
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=ai_workdesk --cov-report=html
+
+# Run specific test file
+uv run pytest tests/unit/test_config.py
+```
+
+### Code Quality
+
+```bash
+# Format code with ruff
+uv run ruff format .
+
+# Lint code
+uv run ruff check .
+
+# Type checking with mypy
+uv run mypy src/
+```
 
 ## 📖 Available Dependency Groups
 

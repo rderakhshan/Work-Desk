@@ -23,6 +23,7 @@ from loguru import logger
 from ai_workdesk import get_auth_manager, get_settings
 from ai_workdesk.rag.ingestion import DocumentProcessor
 from ai_workdesk.rag.vector_store import VectorStoreManager
+from ai_workdesk.smart_dashboard.ui import render_dashboard, DASHBOARD_CSS
 
 # User credentials (in production, use a database)
 USERS = {
@@ -42,35 +43,74 @@ MODELS = {
 }
 
 CUSTOM_CSS = """
-/* Main Background - Pure White */
+/* Project Ambitions: Mesh Gradient & Global Reset */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+:root, .dark, body, gradio-app {
+    --font-sans: 'Outfit', sans-serif !important;
+    --background-fill-primary: transparent !important;
+    --background-fill-secondary: transparent !important;
+    --block-background-fill: transparent !important;
+    --border-color-primary: transparent !important;
+    --body-background-fill: transparent !important;
+}
+
+/* Animated Mesh Gradient Background - REMOVED per user request */
+body {
+    background-color: #ffffff !important;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Outfit', sans-serif !important;
+}
+
 .gradio-container {
     background: #ffffff !important;
-    min-height: 100vh !important; /* Force full viewport height */
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
     display: flex;
     flex-direction: column;
 }
 
-/* Force White on All Panels and Containers */
-.glass-panel, .gray-panel, .panel {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 16px !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+/* Sidebar - Glass & Borderless */
+.sidebar-container {
+    height: 100vh !important;
+    overflow-y: auto !important;
+    border-right: 1px solid rgba(255,255,255,0.1) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px) !important;
 }
 
-/* Tabs - Remove Default Grey */
+/* Main Content - Full Width & Transparent */
+.main-content {
+    height: 100vh !important;
+    overflow-y: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* Force Transparency on Panels */
+.glass-panel, .gray-panel, .panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Tabs - Clean */
 .tabs, .tabitem {
-    background: #ffffff !important;
+    background: transparent !important;
     border: none !important;
 }
 
-/* Chatbot - White Background & Full Height */
+/* Chatbot - Floating Glass */
 .chat-container {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 16px !important;
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02) !important;
-    height: 75vh !important; /* Dynamic viewport height */
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 24px !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37) !important;
+    height: 75vh !important;
     overflow-y: auto !important;
 }
 
@@ -192,7 +232,7 @@ h1, h2 {
 .sidebar-logo img:hover {
     transform: scale(1.05);
 }
-"""
+""" + DASHBOARD_CSS
 
 
 class AIWorkdeskUI:
@@ -429,18 +469,31 @@ class AIWorkdeskUI:
                         )
                     
                     if retrieved_docs:
-                        # Format context
+                        # Format context with source tracking
                         context_parts = []
+                        sources = []
                         for i, doc in enumerate(retrieved_docs, 1):
+                            # Extract source metadata
+                            source_info = doc.metadata.get('source', 'Unknown')
+                            # Get just the filename if it's a full path
+                            if '/' in source_info or '\\' in source_info:
+                                source_info = source_info.split('/')[-1].split('\\')[-1]
+                            
                             context_parts.append(f"[Document {i}]\n{doc.page_content}\n")
+                            sources.append(f"[{i}] {source_info}")
+                        
                         context = "\n".join(context_parts)
                         logger.info(f"Retrieved {len(retrieved_docs)} documents using {rag_technique}")
                     else:
                         logger.info("No documents retrieved")
+                        sources = []
                         
                 except Exception as e:
                     logger.error(f"Error during retrieval: {e}")
                     context = ""
+                    sources = []
+            else:
+                sources = []
             
             # Step 2: Construct the prompt
             if context:
@@ -451,7 +504,7 @@ Context from knowledge base:
 
 User question: {message}
 
-Please answer based on the context provided above."""
+IMPORTANT: When answering, cite your sources using inline citations like [1], [2], etc. to reference the document numbers above. Use these citations throughout your answer when you reference information from specific documents."""
             else:
                 full_prompt = f"{system_prompt}\n\nUser: {message}"
             
@@ -489,7 +542,11 @@ Please answer based on the context provided above."""
                     logger.error(f"Ollama error: {e}")
                     response = f"❌ Ollama Error: {str(e)}\n\nMake sure Ollama is running and the model '{model}' is available."
             
-            # Step 4: Update history
+            # Step 4: Add source citations if documents were retrieved
+            if sources:
+                response += f"\n\n---\n**📚 Sources:**\n" + "\n".join(sources)
+            
+            # Step 5: Update history
             history.append({"role": "user", "content": message})
             history.append({"role": "assistant", "content": response})
             return history, ""
@@ -578,14 +635,13 @@ Please answer based on the context provided above."""
                     )
 
                 # Main Content
-                with gr.Column(scale=5):
+                with gr.Column(scale=5, elem_classes=["main-content"]):
                     
                     # HOME PAGE
                     with gr.Group(visible=True) as home_page:
-                        gr.Markdown("# 🏠 Welcome to AI Workdesk")
-                        gr.Markdown("Your professional environment for AI engineering and RAG development.")
-                        gr.Markdown("### Status")
-                        gr.Markdown(self.get_auth_status())
+                        dashboard_html, refresh_fn = render_dashboard()
+                        # Auto-load dashboard data
+                        demo.load(fn=refresh_fn, outputs=dashboard_html)
 
                     # WORKDESK PAGE
                     with gr.Group(visible=False) as workdesk_page:
@@ -595,7 +651,10 @@ Please answer based on the context provided above."""
                                 with gr.Tabs():
                                     with gr.TabItem("📤 Ingestion"):
                                         gr.Markdown("### 📄 Document Ingestion")
-                                        file_input = gr.File(file_count="multiple", label="Upload Documents")
+                                        file_input = gr.File(
+                                            file_count="multiple", 
+                                            label="Upload Documents (TXT, PDF, MD, DOCX, CSV, JSON, HTML, PPTX, XLSX)"
+                                        )
                                         with gr.Row():
                                             ingest_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
                                             ingest_chunk_overlap = gr.Slider(0, 200, 50, step=10, label="Overlap")
@@ -1125,7 +1184,7 @@ def main() -> None:
     ui = AIWorkdeskUI()
     ui.launch(
         share=False,  # Set to True for public link
-        server_port=7860,
+        server_port=None, # Allow dynamic port allocation
         auth=True,  # Enable authentication
     )
 

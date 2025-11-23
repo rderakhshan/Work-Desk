@@ -4,7 +4,7 @@ from loguru import logger
 import chromadb
 from chromadb.config import Settings
 from langchain_core.documents import Document
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 
 class VectorStoreManager:
     """Manages interactions with the Vector Database (ChromaDB) and supports multiple embedding providers."""
@@ -34,9 +34,9 @@ class VectorStoreManager:
             model_name = embedding_model or settings.default_embedding_model
             self.embedding_function = OpenAIEmbeddings(model=model_name)
         else:  # default to huggingface
-            from langchain_community.embeddings import SentenceTransformerEmbeddings
+            from langchain_huggingface import HuggingFaceEmbeddings
             model_name = embedding_model or "all-MiniLM-L6-v2"
-            self.embedding_function = SentenceTransformerEmbeddings(model_name=model_name)
+            self.embedding_function = HuggingFaceEmbeddings(model_name=model_name)
 
         # Initialize LangChain wrapper with the chosen embedding function
         self.vector_store = Chroma(
