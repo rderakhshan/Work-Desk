@@ -25,6 +25,7 @@ from ai_workdesk.rag.ingestion import DocumentProcessor
 from ai_workdesk.rag.vector_store import VectorStoreManager
 from ai_workdesk.rag.visualization import EmbeddingVisualizer, estimate_tokens, analyze_cluster_quality
 from ai_workdesk.rag.graph_rag import GraphRAG
+from ai_workdesk.rag.advanced_features import OCRProcessor, RAGEvaluator, MultimodalEmbedder, DataCleaner
 from ai_workdesk.smart_dashboard.ui import render_dashboard, DASHBOARD_CSS
 
 # User credentials (in production, use a database)
@@ -259,6 +260,14 @@ class AIWorkdeskUI:
         # Initialize GraphRAG
         logger.info("Initializing GraphRAG...")
         self.graph_rag = GraphRAG()
+        
+        # Initialize Advanced Features
+        logger.info("Initializing advanced features...")
+        try:
+            self.data_cleaner = DataCleaner()
+        except Exception as e:
+            logger.warning(f"DataCleaner initialization failed: {e}")
+            self.data_cleaner = None
         
         self._vector_store = None  # Lazy load to avoid blocking on model download
         self.page_size = 20  # Pagination size
