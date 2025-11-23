@@ -943,105 +943,104 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                             )
 
                         # Chat interaction handlers
-                        msg.submit(
-                            self.chat_with_ai,
-                            [
-                                msg,
-                                chatbot,
-                                model_dropdown,
-                                rag_dropdown,
-                                database_dropdown,
-                                temperature_slider,
-                                max_tokens_slider,
-                                top_k_slider,
-                                similarity_threshold,
-                                chunk_size,
-                                chunk_overlap,
-                                use_reranker,
-                                system_prompt,
-                            ],
-                            [chatbot, msg],
-                        )
+                                msg.submit(
+                                    self.chat_with_ai,
+                                    [
+                                        msg,
+                                        chatbot,
+                                        model_dropdown,
+                                        rag_dropdown,
+                                        database_dropdown,
+                                        temperature_slider,
+                                        max_tokens_slider,
+                                        top_k_slider,
+                                        similarity_threshold,
+                                        chunk_size,
+                                        chunk_overlap,
+                                        use_reranker,
+                                        system_prompt,
+                                    ],
+                                    [chatbot, msg],
+                                )
 
-                        send_btn.click(
-                            self.chat_with_ai,
-                            [
-                                msg,
-                                chatbot,
-                                model_dropdown,
-                                rag_dropdown,
-                                database_dropdown,
-                                temperature_slider,
-                                max_tokens_slider,
-                                top_k_slider,
-                                similarity_threshold,
-                                chunk_size,
-                                chunk_overlap,
-                                use_reranker,
-                                system_prompt,
-                            ],
-                            [chatbot, msg],
-                        )
+                                send_btn.click(
+                                    self.chat_with_ai,
+                                    [
+                                        msg,
+                                        chatbot,
+                                        model_dropdown,
+                                        rag_dropdown,
+                                        database_dropdown,
+                                        temperature_slider,
+                                        max_tokens_slider,
+                                        top_k_slider,
+                                        similarity_threshold,
+                                        chunk_size,
+                                        chunk_overlap,
+                                        use_reranker,
+                                        system_prompt,
+                                    ],
+                                    [chatbot, msg],
+                                )
 
-                        # Provider change updates model list
-                        def update_models(provider):
-                            models = MODELS.get(provider, MODELS["Ollama"])
-                            return gr.update(choices=models, value=models[0])
-                        
-                        provider_dropdown.change(
-                            update_models,
-                            inputs=[provider_dropdown],
-                            outputs=[model_dropdown]
-                        )
+                                # Provider change updates model list
+                                def update_models(provider):
+                                    models = MODELS.get(provider, MODELS["Ollama"])
+                                    return gr.update(choices=models, value=models[0])
+                                
+                                provider_dropdown.change(
+                                    update_models,
+                                    inputs=[provider_dropdown],
+                                    outputs=[model_dropdown]
+                                )
 
-                        clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
-                        
-                        # Download with JavaScript to trigger browser Save As dialog
-                        download_btn.click(
-                            None,
-                            inputs=[chatbot],
-                            outputs=None,
-                            js="""(history) => {
-                                if (!history || history.length === 0) {
-                                    alert('No chat history to export');
-                                    return;
-                                }
+                                clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
                                 
-                                // Generate markdown content
-                                let md = '# AI Workdesk Chat Export\\n\\n';
-                                md += `**Exported**: ${new Date().toLocaleString()}\\n\\n`;
-                                md += '---\\n\\n';
-                                
-                                history.forEach(msg => {
-                                    if (msg.role === 'user') {
-                                        md += `## 👤 User\\n\\n${msg.content}\\n\\n`;
-                                    } else if (msg.role === 'assistant') {
-                                        md += `## 🤖 Assistant\\n\\n${msg.content}\\n\\n`;
-                                    }
-                                });
-                                
-                                // Create blob and trigger download with Save As dialog
-                                const blob = new Blob([md], {type: 'text/markdown;charset=utf-8'});
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                
-                                // Generate filename with timestamp
-                                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                                a.download = `ai_workdesk_chat_${timestamp}.md`;
-                                
-                                // Trigger download
-                                document.body.appendChild(a);
-                                a.click();
-                                
-                                // Cleanup
-                                setTimeout(() => {
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                }, 100);
-                            }"""
-                        )
-
+                                # Download with JavaScript to trigger browser Save As dialog
+                                download_btn.click(
+                                    None,
+                                    inputs=[chatbot],
+                                    outputs=None,
+                                    js="""(history) => {
+                                        if (!history || history.length === 0) {
+                                            alert('No chat history to export');
+                                            return;
+                                        }
+                                        
+                                        // Generate markdown content
+                                        let md = '# AI Workdesk Chat Export\\n\\n';
+                                        md += `**Exported**: ${new Date().toLocaleString()}\\n\\n`;
+                                        md += '---\\n\\n';
+                                        
+                                        history.forEach(msg => {
+                                            if (msg.role === 'user') {
+                                                md += `## 👤 User\\n\\n${msg.content}\\n\\n`;
+                                            } else if (msg.role === 'assistant') {
+                                                md += `## 🤖 Assistant\\n\\n${msg.content}\\n\\n`;
+                                            }
+                                        });
+                                        
+                                        // Create blob and trigger download with Save As dialog
+                                        const blob = new Blob([md], {type: 'text/markdown;charset=utf-8'});
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        
+                                        // Generate filename with timestamp
+                                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                                        a.download = `ai_workdesk_chat_${timestamp}.md`;
+                                        
+                                        // Trigger download
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        
+                                        // Cleanup
+                                        setTimeout(() => {
+                                            document.body.removeChild(a);
+                                            URL.revokeObjectURL(url);
+                                        }, 100);
+                                    }"""
+                                )
 
                             # TAB 3: Chat LAB (Pure Chat, No RAG)
                             with gr.TabItem("💬 Chat LAB"):
@@ -1172,7 +1171,6 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
 
                                         clear_btn_pure.click(lambda: None, None, chatbot_pure, queue=False)
                                         download_btn_pure.click(self.export_chat, inputs=[chatbot_pure], outputs=[])
-
 
 
                     # About Page
