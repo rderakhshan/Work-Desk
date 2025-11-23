@@ -235,6 +235,16 @@ h1, h2 {
 .sidebar-logo img:hover {
     transform: scale(1.05);
 }
+
+/* Visualization and Graph Plot Containers */
+#viz-plot-container, #graph-plot-container {
+    min-height: 600px !important;
+    height: auto !important;
+}
+
+#viz-plot-container iframe, #graph-plot-container iframe {
+    min-height: 600px !important;
+}
 """ + DASHBOARD_CSS
 
 
@@ -553,8 +563,8 @@ class AIWorkdeskUI:
                 with open(graph_path, "r", encoding="utf-8") as f:
                     graph_html = f.read()
                 
-                # Wrap in iframe for better rendering
-                iframe_html = f'<iframe srcdoc="{graph_html.replace(chr(34), "&quot;")}" width="100%" height="600px" frameborder="0"></iframe>'
+                # Wrap in iframe for better rendering with increased height
+                iframe_html = f'<iframe srcdoc="{graph_html.replace(chr(34), "&quot;")}" width="100%" height="800px" frameborder="0" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></iframe>'
                 
                 return f"✅ Graph built with {stats['nodes']} nodes and {stats['edges']} edges.", iframe_html, stats_md
             else:
@@ -1066,7 +1076,7 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                                 quality_md = gr.Markdown("### 📊 Quality Metrics\n*Generate projection to see metrics*")
                                                 
                                             with gr.Column(scale=3):
-                                                viz_plot = gr.HTML(label="Projection Plot", min_height=600)
+                                                viz_plot = gr.HTML(label="Projection Plot", elem_id="viz-plot-container")
                                         
                                         viz_btn.click(
                                             self.handle_visualization,
@@ -1079,15 +1089,16 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                         gr.Markdown("*Visualize relationships between entities (People, Organizations, Locations) in your documents*")
                                         
                                         with gr.Row():
+                                            graph_btn = gr.Button("🕸️ Generate Graph", variant="primary", size="lg")
+                                            graph_status = gr.Textbox(label="Status", interactive=False, scale=3)
+                                        
+                                        with gr.Row():
                                             with gr.Column(scale=1):
-                                                graph_btn = gr.Button("🕸️ Generate Graph", variant="primary")
-                                                graph_status = gr.Textbox(label="Status", interactive=False)
-                                                
                                                 # Graph Stats
                                                 graph_stats_md = gr.Markdown("### 📊 Graph Statistics\n*Generate graph to see stats*")
                                                 
-                                            with gr.Column(scale=3):
-                                                graph_plot = gr.HTML(label="Knowledge Graph", min_height=600)
+                                            with gr.Column(scale=4):
+                                                graph_plot = gr.HTML(label="Knowledge Graph Visualization", elem_id="graph-plot-container")
                                         
                                         graph_btn.click(
                                             self.handle_graph_generation,

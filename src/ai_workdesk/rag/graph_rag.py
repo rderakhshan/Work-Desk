@@ -83,7 +83,7 @@ class GraphRAG:
             return ""
             
         try:
-            net = Network(height="600px", width="100%", bgcolor="#1e1e1e", font_color="white", notebook=False)
+            net = Network(height="800px", width="100%", bgcolor="#f5f5f5", font_color="#333333", notebook=False)
             net.from_nx(self.graph)
             
             # Physics options for better layout
@@ -91,14 +91,22 @@ class GraphRAG:
             var options = {
               "nodes": {
                 "font": {
-                  "size": 16
-                }
+                  "size": 16,
+                  "color": "#333333"
+                },
+                "borderWidth": 2,
+                "borderWidthSelected": 3
               },
               "edges": {
                 "color": {
-                  "inherit": true
+                  "color": "#848484",
+                  "highlight": "#6366f1",
+                  "hover": "#6366f1"
                 },
-                "smooth": false
+                "smooth": {
+                  "enabled": true,
+                  "type": "continuous"
+                }
               },
               "physics": {
                 "forceAtlas2Based": {
