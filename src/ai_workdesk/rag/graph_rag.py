@@ -60,17 +60,27 @@ class GraphRAG:
                     self.graph.nodes[entity]['value'] = current_weight + 1
 
             # Add edges (co-occurrence)
-            # Connect all entities found in the same document
-            unique_entities = list(set([e[0] for e in entities]))
+            # Connect all entities found in the same document with labeled relationships
+            unique_entities = [(e[0], e[1]) for e in entities]  # Keep entity type info
             for j in range(len(unique_entities)):
                 for k in range(j + 1, len(unique_entities)):
-                    source = unique_entities[j]
-                    target = unique_entities[k]
+                    source_name, source_type = unique_entities[j]
+                    target_name, target_type = unique_entities[k]
                     
-                    if self.graph.has_edge(source, target):
-                        self.graph[source][target]['weight'] += 1
+                    # Create relationship label based on entity types
+                    relationship = f"{source_type}-{target_type}"
+                    
+                    if self.graph.has_edge(source_name, target_name):
+                        self.graph[source_name][target_name]['weight'] += 1
+                        self.graph[source_name][target_name]['title'] = f"{relationship} (co-occurs {self.graph[source_name][target_name]['weight']}x)"
                     else:
-                        self.graph.add_edge(source, target, weight=1)
+                        self.graph.add_edge(
+                            source_name, 
+                            target_name, 
+                            weight=1,
+                            label=relationship,
+                            title=f"{relationship} (co-occurs 1x)"
+                        )
                         
         logger.info(f"Graph built: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges")
 
@@ -86,7 +96,7 @@ class GraphRAG:
             net = Network(height="800px", width="100%", bgcolor="#f5f5f5", font_color="#333333", notebook=False)
             net.from_nx(self.graph)
             
-            # Physics options for better layout
+            # Physics options for better layout and edge labels
             net.set_options("""
             var options = {
               "nodes": {
@@ -98,6 +108,11 @@ class GraphRAG:
                 "borderWidthSelected": 3
               },
               "edges": {
+                "font": {
+                  "size": 12,
+                  "color": "#666666",
+                  "align": "middle"
+                },
                 "color": {
                   "color": "#848484",
                   "highlight": "#6366f1",
@@ -106,6 +121,11 @@ class GraphRAG:
                 "smooth": {
                   "enabled": true,
                   "type": "continuous"
+                },
+                "arrows": {
+                  "to": {
+                    "enabled": false
+                  }
                 }
               },
               "physics": {

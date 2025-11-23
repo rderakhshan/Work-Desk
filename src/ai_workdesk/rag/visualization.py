@@ -60,12 +60,16 @@ class EmbeddingVisualizer:
                 xaxis_title="Dimension 1",
                 yaxis_title="Dimension 2",
                 hovermode='closest',
-                template="plotly_white"
+                template="plotly_white",
+                height=600,
+                width=900
             )
             
-            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False)
+            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False, div_id="plotly-viz")
+            # Wrap in div for proper rendering in Gradio
+            wrapped_html = f'<div style="width:100%; height:600px; overflow:auto;">{html_plot}</div>'
             logger.info(f"Projected {len(embeddings)} embeddings to 2D using {method}")
-            return projected, html_plot
+            return projected, wrapped_html
             
         except Exception as e:
             logger.error(f"Error projecting embeddings: {e}")
@@ -124,12 +128,16 @@ class EmbeddingVisualizer:
                     zaxis_title="Dimension 3"
                 ),
                 hovermode='closest',
-                template="plotly_white"
+                template="plotly_white",
+                height=700,
+                width=900
             )
             
-            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False)
+            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False, div_id="plotly-viz-3d")
+            # Wrap in div for proper rendering in Gradio
+            wrapped_html = f'<div style="width:100%; height:700px; overflow:auto;">{html_plot}</div>'
             logger.info(f"Projected {len(embeddings)} embeddings to 3D using {method}")
-            return projected, html_plot
+            return projected, wrapped_html
             
         except Exception as e:
             logger.error(f"Error projecting embeddings to 3D: {e}")
