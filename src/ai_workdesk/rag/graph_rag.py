@@ -146,3 +146,59 @@ class GraphRAG:
             "density": nx.density(self.graph),
             "components": nx.number_connected_components(self.graph) if self.graph.number_of_nodes() > 0 else 0
         }
+
+    def graph_search(self, query: str, max_hops: int = 2) -> List[str]:
+        """
+        Search the graph for entities related to the query.
+        
+        Args:
+            query: Search query
+            max_hops: Maximum number of hops from query entities
+            
+        Returns:
+            List of related entity names
+        """
+        if self.graph.number_of_nodes() == 0:
+            return []
+            
+        # Extract entities from query
+        query_entities = self.extract_entities(query)
+        query_entity_names = [e[0] for e in query_entities]
+        
+        # Find entities in graph that match query entities
+        related_entities = set()
+        for entity_name in query_entity_names:
+            if self.graph.has_node(entity_name):
+                related_entities.add(entity_name)
+                
+                # Expand to neighbors (graph traversal)
+                try:
+                    # Get neighbors within max_hops
+                    for node in nx.single_source_shortest_path_length(self.graph, entity_name, cutoff=max_hops):
+                        related_entities.add(node)
+                except nx.NodeNotFound:
+                    continue
+        
+        return list(related_entities)
+
+    def get_entity_context(self, entity: str) -> Dict:
+        """
+        Get context information about an entity from the graph.
+        
+        Returns:
+            Dictionary with entity metadata, neighbors, and relationships
+        """
+        if not self.graph.has_node(entity):
+            return {}
+            
+        neighbors = list(self.graph.neighbors(entity))
+        node_data = self.graph.nodes[entity]
+        
+        return {
+            "entity": entity,
+            "label": node_data.get("label", "UNKNOWN"),
+            "frequency": node_data.get("value", 1),
+            "neighbors": neighbors,
+            "neighbor_count": len(neighbors)
+        }
+

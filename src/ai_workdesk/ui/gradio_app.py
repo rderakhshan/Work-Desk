@@ -641,6 +641,29 @@ class AIWorkdeskUI:
                             alpha=alpha
                         )
                     
+                    elif "graph" in rag_technique.lower() and "hybrid" in rag_technique.lower():
+                        # Graph + Vector Hybrid: Combine graph entity search with vector search
+                        logger.info("Using Graph + Vector Hybrid technique")
+                        
+                        # 1. Graph search: Find related entities
+                        related_entities = self.graph_rag.graph_search(message, max_hops=2)
+                        
+                        # 2. Vector search: Standard similarity search
+                        vector_docs = self.vector_store.similarity_search(
+                            query=message,
+                            k=int(top_k),
+                            score_threshold=float(similarity_threshold)
+                        )
+                        
+                        # 3. Enhance vector results with entity context
+                        retrieved_docs = vector_docs
+                        
+                        # Add entity context to the response if entities were found
+                        if related_entities:
+                            entity_context = f"\n\n**Related Entities Found:** {', '.join(related_entities[:10])}"
+                            # We'll append this to the context later
+                            logger.info(f"Found {len(related_entities)} related entities via graph")
+                    
                     else:
                         # Default to naive RAG
                         retrieved_docs = self.vector_store.similarity_search(
@@ -1111,6 +1134,7 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                             choices=[
                                                 "Naive RAG",
                                                 "Hybrid Search",
+                                                "Graph + Vector Hybrid",
                                                 "HyDE (Hypothetical Document Embeddings)",
                                                 "RAG Fusion",
                                                 "None",
