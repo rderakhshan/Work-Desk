@@ -444,7 +444,7 @@ class AIWorkdeskUI:
         try:
             # 1. Get all embeddings
             data = self.vector_store.get_all_embeddings()
-            if not data or not data.get("embeddings"):
+            if not data or "embeddings" not in data or len(data.get("embeddings", [])) == 0:
                 return "⚠️ No embeddings found in collection.", "", ""
             
             embeddings = data["embeddings"]
@@ -528,7 +528,7 @@ class AIWorkdeskUI:
         try:
             # 1. Get all documents
             data = self.vector_store.get_all_embeddings()
-            if not data or not data.get("documents"):
+            if not data or "documents" not in data or len(data.get("documents", [])) == 0:
                 return "⚠️ No documents found in collection.", "", ""
             
             documents = data["documents"]
@@ -552,9 +552,11 @@ class AIWorkdeskUI:
             if graph_path and os.path.exists(graph_path):
                 with open(graph_path, "r", encoding="utf-8") as f:
                     graph_html = f.read()
-                # Clean up temp file? Maybe keep it for now or let OS handle it
-                # os.remove(graph_path) 
-                return f"✅ Graph built with {stats['nodes']} nodes and {stats['edges']} edges.", graph_html, stats_md
+                
+                # Wrap in iframe for better rendering
+                iframe_html = f'<iframe srcdoc="{graph_html.replace(chr(34), "&quot;")}" width="100%" height="600px" frameborder="0"></iframe>'
+                
+                return f"✅ Graph built with {stats['nodes']} nodes and {stats['edges']} edges.", iframe_html, stats_md
             else:
                 return "❌ Failed to generate graph visualization.", "", ""
                 
