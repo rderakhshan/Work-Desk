@@ -460,6 +460,17 @@ class AIWorkdeskUI:
                                 if len(retrieved_docs) >= int(top_k):
                                     break
                     
+                    elif "hybrid" in rag_technique.lower():
+                        # Hybrid Search: BM25 + Dense
+                        logger.info("Using Hybrid Search technique")
+                        # Alpha parameter should come from UI (default 0.5)
+                        alpha = 0.5  # Will be passed as parameter later
+                        retrieved_docs = self.vector_store.hybrid_search(
+                            query=message,
+                            k=int(top_k),
+                            alpha=alpha
+                        )
+                    
                     else:
                         # Default to naive RAG
                         retrieved_docs = self.vector_store.similarity_search(
