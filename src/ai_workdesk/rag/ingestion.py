@@ -97,3 +97,42 @@ class DocumentProcessor:
         chunks = text_splitter.split_documents(documents)
         logger.info(f"Split {len(documents)} documents into {len(chunks)} chunks")
         return chunks
+
+    def chunk_documents_semantic(
+        self, 
+        documents: List[Document],
+        breakpoint_threshold: float = 0.5
+    ) -> List[Document]:
+        """
+        Split documents using semantic chunking (topic-based breakpoints).
+        
+        Args:
+            documents: List of documents to split.
+            breakpoint_threshold: Similarity threshold for detecting topic changes (0-1).
+            
+        Returns:
+            List of semantically chunked Documents.
+        """
+        try:
+            from langchain_experimental.text_splitter import SemanticChunker
+            from langchain_huggingface import HuggingFaceEmbeddings
+            
+            if not documents:
+                return []
+            
+            # Use lightweight embedding model for chunking
+            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            
+            text_splitter = SemanticChunker(
+                embeddings=embeddings,
+                breakpoint_threshold_type="percentile",
+                breakpoint_threshold_amount=int(breakpoint_threshold * 100)
+            )
+            
+            chunks = text_splitter.split_documents(documents)
+            logger.info(f"Semantically split {len(documents)} documents into {len(chunks)} chunks")
+            return chunks
+            
+        except Exception as e:
+            logger.error(f"Error in semantic chunking: {e}. Falling back to fixed-size chunking.")
+            return self.chunk_documents(documents)

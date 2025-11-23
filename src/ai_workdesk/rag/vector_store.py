@@ -127,3 +127,123 @@ class VectorStoreManager:
         except Exception as e:
             logger.error(f"Error during similarity search: {e}")
             return []
+
+    def hybrid_search(self, query: str, k: int = 5, alpha: float = 0.5) -> List[Document]:
+        """Perform hybrid search combining BM25 (sparse) and dense vector search.
+        
+        Args:
+            query: The search query.
+            k: Number of results to return.
+            alpha: Weight between BM25 and dense (0.0 = pure BM25, 1.0 = pure dense).
+            
+        Returns:
+            List of relevant Document chunks.
+        """
+        try:
+            from rank_bm25 import BM25Okapi
+            
+            # Get all documents for BM25
+            collection = self.client.get_collection(self.collection_name)
+            total_docs = collection.count()
+            
+            if total_docs == 0:
+                logger.warning("Collection is EMPTY! No documents to search.")
+                return []
+            
+            # Retrieve all documents
+            all_results = collection.get(include=["documents", "metadatas"])
+            all_texts = all_results["documents"]
+            all_metadatas = all_results["metadatas"]
+            
+            # BM25 scoring
+            tokenized_corpus = [doc.split() for doc in all_texts]
+            bm25 = BM25Okapi(tokenized_corpus)
+            tokenized_query = query.split()
+            bm25_scores = bm25.get_scores(tokenized_query)
+            
+            # Dense vector scoring
+            dense_results = self.vector_store.similarity_search_with_score(query, k=total_docs)
+            dense_scores = {i: 1.0 / (1.0 + score) for i, (_, score) in enumerate(dense_results)}
+            
+            # Normalize scores to [0, 1]
+            max_bm25 = max(bm25_scores) if max(bm25_scores) > 0 else 1.0
+            bm25_scores_norm = [score / max_bm25 for score in bm25_scores]
+            
+            # Combine scores
+            combined_scores = []
+            for i in range(len(all_texts)):
+                bm25_score = bm25_scores_norm[i]
+                dense_score = dense_scores.get(i, 0.0)
+                combined = (1 - alpha) * bm25_score + alpha * dense_score
+                combined_scores.append((i, combined))
+            
+            # Sort by combined score and take top-k
+            combined_scores.sort(key=lambda x: x[1], reverse=True)
+            top_indices = [idx for idx, _ in combined_scores[:k]]
+            
+            # Create Document objects
+            results = []
+            for idx in top_indices:
+                doc = Document(
+                    page_content=all_texts[idx],
+                    metadata=all_metadatas[idx] if all_metadatas else {}
+                )
+                results.append(doc)
+            
+            logger.info(f"Hybrid search retrieved {len(results)} documents (alpha={alpha})")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error during hybrid search: {e}")
+            return []
+
+    # Collection Management Methods
+    def list_collections(self) -> List[str]:
+        """List all available collections."""
+        try:
+            collections = self.client.list_collections()
+            return [c.name for c in collections]
+        except Exception as e:
+            logger.error(f"Error listing collections: {e}")
+            return []
+
+    def create_collection(self, collection_name: str) -> bool:
+        """Create a new collection."""
+        try:
+            self.client.create_collection(collection_name)
+            logger.info(f"Created collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error creating collection {collection_name}: {e}")
+            return False
+
+    def switch_collection(self, collection_name: str) -> bool:
+        """Switch to a different collection."""
+        try:
+            # Check if collection exists
+            collections = [c.name for c in self.client.list_collections()]
+            if collection_name not in collections:
+                logger.error(f"Collection {collection_name} does not exist")
+                return False
+            
+            self.collection_name = collection_name
+            self.vector_store = Chroma(
+                client=self.client,
+                collection_name=self.collection_name,
+                embedding_function=self.embedding_function,
+            )
+            logger.info(f"Switched to collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error switching to collection {collection_name}: {e}")
+            return False
+
+    def delete_collection(self, collection_name: str) -> bool:
+        """Delete a collection."""
+        try:
+            self.client.delete_collection(collection_name)
+            logger.info(f"Deleted collection: {collection_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting collection {collection_name}: {e}")
+            return False

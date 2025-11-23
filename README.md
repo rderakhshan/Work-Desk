@@ -13,6 +13,13 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 
 ## 🆕 Recent Updates (November 23, 2025)
 
+### 🧬 Embedding LAB - Phase 1 Enhancements ✅
+- ✅ **Dynamic Model Selection**: Choose embedding models before ingestion (HuggingFace, Ollama, OpenAI)
+- ✅ **Web Crawling**: Ingest content directly from URLs with configurable depth (0-5 levels)
+- ✅ **Enhanced Ingestion UI**: Dual-tab interface (Files + Web) with model dropdowns
+- 📦 **Backup Available**: `git checkout embedding-lab-phase1-backup` to restore this working state
+- 📋 **Future Phases**: See [`implementation_plan.md`](./implementation_plan.md) for Phases 2-5 roadmap
+
 ### 🏠 Smart Homepage ("Project Ambitions")
 - ✅ **Full-Width Glassmorphism UI**: Modern, asymmetrical 65/35 split layout
 - ✅ **Time & Weather Widget**: Live clock and weather display at top right
@@ -225,21 +232,26 @@ The AI Workdesk includes a complete RAG (Retrieval-Augmented Generation) pipelin
 
 Upload and process documents to build your knowledge base:
 
-1. **Navigate to Work Desk → Embedding LAB**
-2. **Upload Documents**: Support for multiple formats (see below)
-3. **Configure Ingestion Settings**:
-   - **Chunk Size**: 256, 512, 1024, or 2048 tokens
+1. **Navigate to Work Desk → Embedding LAB → Ingestion**
+2. **Select Embedding Model**:
+   - **Provider**: HuggingFace, Ollama, or OpenAI
+   - **Model**: Choose from presets or enter custom model name
+     - HuggingFace: `all-MiniLM-L6-v2`, `bge-m3`, `nomic-embed-text`
+     - Ollama: Any locally available embedding model
+     - OpenAI: `text-embedding-3-small`, `text-embedding-3-large`
+3. **Choose Ingestion Method**:
+   - **📄 Files Tab**: Upload local documents (see supported formats below)
+   - **🌐 Web Tab**: Crawl and ingest from URLs
+     - Enter target URL
+     - Set crawl depth (0 = single page, 1-5 = follow links)
+4. **Configure Chunking Settings**:
+   - **Chunk Size**: 256, 512, or 1024 tokens
    - **Chunk Overlap**: 0-200 tokens (recommended: 50)
-   - **Embedding Model**: Choose from:
-     - **Ollama** (default, privacy-first, offline)
-     - OpenAI
-     - HuggingFace
-     - Google Gemini
-4. **Click "Ingest & Embed"** to process and store documents
+5. **Click "🚀 Ingest Files" or "🕷️ Crawl & Ingest"**
 
 The system will:
-- Load and parse your documents
-- Split them into optimized chunks
+- Load and parse your documents or crawl the specified URL
+- Split content into optimized chunks
 - Generate embeddings using the selected model
 - Store vectors in ChromaDB for fast retrieval
 
