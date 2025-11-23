@@ -65,15 +65,12 @@ class EmbeddingVisualizer:
                 width=900
             )
             
-            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False, div_id="plotly-viz")
-            # Wrap in div for proper rendering in Gradio
-            wrapped_html = f'<div style="width:100%; height:600px; overflow:auto;">{html_plot}</div>'
             logger.info(f"Projected {len(embeddings)} embeddings to 2D using {method}")
-            return projected, wrapped_html
+            return projected, fig  # Return figure object, not HTML
             
         except Exception as e:
             logger.error(f"Error projecting embeddings: {e}")
-            return np.array([]), "<p>Error generating visualization</p>"
+            return np.array([]), None  # Return None instead of error HTML
     
     def project_embeddings_3d(
         self, 
@@ -133,15 +130,12 @@ class EmbeddingVisualizer:
                 width=900
             )
             
-            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False, div_id="plotly-viz-3d")
-            # Wrap in div for proper rendering in Gradio
-            wrapped_html = f'<div style="width:100%; height:700px; overflow:auto;">{html_plot}</div>'
             logger.info(f"Projected {len(embeddings)} embeddings to 3D using {method}")
-            return projected, wrapped_html
+            return projected, fig  # Return figure object, not HTML
             
         except Exception as e:
             logger.error(f"Error projecting embeddings to 3D: {e}")
-            return np.array([]), "<p>Error generating 3D visualization</p>"
+            return np.array([]), None  # Return None instead of error HTML
 
 
 def estimate_tokens(text: str, model: str = "gpt-4") -> Tuple[int, float]:

@@ -1076,7 +1076,7 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                                 quality_md = gr.Markdown("### 📊 Quality Metrics\n*Generate projection to see metrics*")
                                                 
                                             with gr.Column(scale=3):
-                                                viz_plot = gr.HTML(label="Projection Plot", elem_id="viz-plot-container")
+                                                viz_plot = gr.Plot(label="Projection Plot")
                                         
                                         viz_btn.click(
                                             self.handle_visualization,
