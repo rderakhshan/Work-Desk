@@ -11,7 +11,7 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🌐 **Flexible Providers**: Support for OpenAI, HuggingFace, Ollama, and Google Gemini embeddings
 - 💬 **Context-Aware Chat**: Chat with your dashboard items using selected AI models
 
-## 🆕 Recent Updates (November 22, 2025)
+## 🆕 Recent Updates (November 23, 2025)
 
 ### 🏠 Smart Homepage ("Project Ambitions")
 - ✅ **Full-Width Glassmorphism UI**: Modern, asymmetrical 65/35 split layout
@@ -19,13 +19,16 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - ✅ **Smart Feed**: Timeline-style feed combining emails, news, videos, and trends
 - ✅ **Clickable Items**: All dashboard items link to their original sources
 - ✅ **Context-Aware AI Chat**: Chat with dashboard items using Ollama or OpenAI
-- ✅ **Default Model**: DeepSeek-R1:7b for intelligent reasoning
+- ✅ **File Attachments**: Upload text files (.txt, .md, .py, etc.) for AI analysis
+- ✅ **Inline Citations**: AI answers include "Sources Used" with links and urgency scores
+- ✅ **Enhanced Progress**: Visible "AI is thinking..." indicator during processing
+- ✅ **Default Models**: DeepSeek-R1:7b (Ollama) and GPT-4o-mini (OpenAI)
 - ✅ **Floating Stats**: Real-time urgency scores and item counts
 - ✅ **Quick Actions**: One-click access to common tasks
 
 ### RAG Enhancements
-
-### Vector Store Improvements
+- ✅ **True Vector Search**: Semantic retrieval using `langchain-chroma` and `langchain-huggingface`
+- ✅ **Contextual Retrieval**: Top-5 relevant dashboard items injected into chat context
 - ✅ **Collection Stats**: Real-time document count logging
 - ✅ **Better Error Messages**: Shows actual distances when retrieval fails
 - ✅ **Threshold Guidance**: Recommends optimal similarity threshold values (0.3-0.4 for ChromaDB)
