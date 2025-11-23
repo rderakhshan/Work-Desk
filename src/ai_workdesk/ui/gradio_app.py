@@ -813,8 +813,8 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                         switch_btn.click(switch_collection, inputs=[collections_list], outputs=[collection_status])
                                         delete_btn_coll.click(delete_collection, inputs=[collections_list], outputs=[collection_status, collections_list])
 
-                            # TAB 2: Chat LAB
-                            with gr.TabItem("💬 Chat LAB"):
+                            # TAB 2: RAG LAB
+                            with gr.TabItem("🧠 RAG LAB"):
                                 with gr.Row(elem_classes=["chat-row"]):
                                     with gr.Column(scale=7):
                                         chatbot = gr.Chatbot(
@@ -1041,6 +1041,137 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                 }, 100);
                             }"""
                         )
+
+
+                            # TAB 3: Chat LAB (Pure Chat, No RAG)
+                            with gr.TabItem("💬 Chat LAB"):
+                                with gr.Row(elem_classes=["chat-row"]):
+                                    with gr.Column(scale=7):
+                                        chatbot_pure = gr.Chatbot(
+                                            label="AI Assistant",
+                                            show_copy_button=True,
+                                            elem_classes=["chat-container"],
+                                            type="messages",
+                                            height=800,
+                                            render_markdown=True,
+                                        )
+
+                                        with gr.Row():
+                                            msg_pure = gr.Textbox(
+                                                label="Message",
+                                                placeholder="Ask me anything...",
+                                                scale=4,
+                                                show_label=False,
+                                                container=False,
+                                            )
+                                            send_btn_pure = gr.Button("Send 🚀", scale=1, variant="primary", elem_classes=["primary-btn"])
+
+                                        with gr.Row():
+                                            with gr.Column(scale=1):
+                                                clear_btn_pure = gr.Button(
+                                                    "🗑️ Clear Chat", variant="secondary", elem_classes=["secondary-btn"]
+                                                )
+                                            with gr.Column(scale=1):
+                                                download_btn_pure = gr.Button("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
+
+
+                                    with gr.Column(scale=2, elem_classes=["glass-panel"]):
+                                        provider_dropdown_pure = gr.Dropdown(
+                                            choices=["Ollama", "OpenAI"],
+                                            value="Ollama",
+                                            label="Provider",
+                                        )
+
+                                        model_dropdown_pure = gr.Dropdown(
+                                            choices=MODELS["Ollama"],
+                                            value="deepseek-r1:7b",
+                                            label="Model",
+                                            allow_custom_value=True,
+                                        )
+
+                                        gr.Markdown("### ⚙️ Model Settings")
+
+                                        temperature_slider_pure = gr.Slider(
+                                            minimum=0.0,
+                                            maximum=1.0,
+                                            value=0.7,
+                                            step=0.1,
+                                            label="Temperature",
+                                        )
+
+                                        max_tokens_slider_pure = gr.Slider(
+                                            minimum=100,
+                                            maximum=4096,
+                                            value=1024,
+                                            step=100,
+                                            label="Max Tokens",
+                                        )
+
+                                        system_prompt_pure = gr.Textbox(
+                                            label="System Prompt",
+                                            value="You are a helpful AI assistant.",
+                                            lines=3,
+                                        )
+
+                                        # Dummy inputs for RAG parameters (disabled for pure chat)
+                                        rag_none = gr.State("None")
+                                        db_none = gr.State("ChromaDB") 
+                                        top_k_dummy = gr.State(5)
+                                        threshold_dummy = gr.State(0.0)
+                                        chunk_dummy = gr.State(512)
+                                        overlap_dummy = gr.State(50)
+                                        rerank_dummy = gr.State(False)
+
+                                        # Event Wiring for Pure Chat
+                                        msg_pure.submit(
+                                            self.chat_with_ai,
+                                            inputs=[
+                                                msg_pure, 
+                                                chatbot_pure, 
+                                                model_dropdown_pure,
+                                                rag_none, # RAG Disabled
+                                                db_none,
+                                                temperature_slider_pure,
+                                                max_tokens_slider_pure,
+                                                top_k_dummy,
+                                                threshold_dummy,
+                                                chunk_dummy,
+                                                overlap_dummy,
+                                                rerank_dummy,
+                                                system_prompt_pure
+                                            ],
+                                            outputs=[chatbot_pure, msg_pure]
+                                        )
+
+                                        send_btn_pure.click(
+                                            self.chat_with_ai,
+                                            inputs=[
+                                                msg_pure, 
+                                                chatbot_pure, 
+                                                model_dropdown_pure,
+                                                rag_none, # RAG Disabled
+                                                db_none,
+                                                temperature_slider_pure,
+                                                max_tokens_slider_pure,
+                                                top_k_dummy,
+                                                threshold_dummy,
+                                                chunk_dummy,
+                                                overlap_dummy,
+                                                rerank_dummy,
+                                                system_prompt_pure
+                                            ],
+                                            outputs=[chatbot_pure, msg_pure]
+                                        )
+
+                                        # Provider change updates model list
+                                        provider_dropdown_pure.change(
+                                            update_models,
+                                            inputs=[provider_dropdown_pure],
+                                            outputs=[model_dropdown_pure]
+                                        )
+
+                                        clear_btn_pure.click(lambda: None, None, chatbot_pure, queue=False)
+                                        download_btn_pure.click(self.export_chat, inputs=[chatbot_pure], outputs=[])
 
 
 
