@@ -345,8 +345,8 @@ class AIWorkdeskUI:
             self.metadata_store.delete_entry(int(entry_id))
         return self.load_metadata(page)
 
-    def handle_ingestion(self, files, chunk_size, chunk_overlap) -> str:
-        """Handle document ingestion."""
+    def handle_ingestion(self, files, chunk_size, chunk_overlap, chunking_strategy="Fixed Size") -> str:
+        """Handle document ingestion with configurable chunking strategy."""
         if not files:
             return "⚠️ No files uploaded."
             
@@ -368,17 +368,21 @@ class AIWorkdeskUI:
                 except Exception as e:
                     logger.error(f"Error recording metadata for {f.name}: {e}")
 
-            # 3. Chunk Documents
-            chunks = self.doc_processor.chunk_documents(
-                documents, 
-                chunk_size=int(chunk_size), 
-                chunk_overlap=int(chunk_overlap)
-            )
+            # 3. Chunk Documents (Fixed or Semantic)
+            if chunking_strategy == "Semantic":
+                chunks = self.doc_processor.chunk_documents_semantic(documents)
+            else:  # Fixed Size
+                chunks = self.doc_processor.chunk_documents(
+                    documents, 
+                    chunk_size=int(chunk_size), 
+                    chunk_overlap=int(chunk_overlap)
+                )
             
             # 4. Index in Vector Store
             self.vector_store.add_documents(chunks)
             
-            return f"✅ Successfully ingested {len(files)} files ({len(chunks)} chunks)!"
+            strategy_msg = "semantic chunking" if chunking_strategy == "Semantic" else f"{chunk_size}-token chunks"
+            return f"✅ Successfully ingested {len(files)} files ({len(chunks)} chunks using {strategy_msg})!"
         except Exception as e:
             logger.error(f"Ingestion error: {e}")
             return f"❌ Error during ingestion: {str(e)}"
@@ -669,12 +673,19 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                         with gr.Row():
                                             ingest_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
                                             ingest_chunk_overlap = gr.Slider(0, 200, 50, step=10, label="Overlap")
+                                        
+                                        chunking_strategy = gr.Dropdown(
+                                            choices=["Fixed Size", "Semantic"],
+                                            value="Fixed Size",
+                                            label="Chunking Strategy"
+                                        )
+                                        
                                         ingest_btn = gr.Button("🚀 Ingest Documents", variant="primary", elem_classes=["primary-btn"])
                                         ingest_status = gr.Textbox(label="Status", interactive=False)
                                         
                                         ingest_btn.click(
                                             self.handle_ingestion,
-                                            inputs=[file_input, ingest_chunk_size, ingest_chunk_overlap],
+                                            inputs=[file_input, ingest_chunk_size, ingest_chunk_overlap, chunking_strategy],
                                             outputs=[ingest_status]
                                         )
 
@@ -738,6 +749,70 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                         # Load initial data (on load)
                                         demo.load(self.load_metadata, inputs=[page_slider], outputs=[metadata_df, page_slider])
 
+                                    with gr.TabItem("📚 Collections"):
+                                        gr.Markdown("### 🗂️ Collection Management")
+                                        gr.Markdown("*Organize documents into separate collections*")
+                                        
+                                        with gr.Row():
+                                            collections_list = gr.Dropdown(
+                                                choices=self.vector_store.list_collections(),
+                                                value=self.vector_store.collection_name,
+                                                label="Active Collection",
+                                                allow_custom_value=False
+                                            )
+                                            refresh_collections_btn = gr.Button("🔄 Refresh", scale=1)
+                                        
+                                        with gr.Row():
+                                            new_collection_name = gr.Textbox(
+                                                label="New Collection Name",
+                                                placeholder="e.g., legal_docs, research_papers"
+                                            )
+                                            create_btn = gr.Button("➕ Create", variant="primary")
+                                        
+                                        with gr.Row():
+                                            switch_btn = gr.Button("🔀 Switch to Selected", variant="secondary")
+                                            delete_btn_coll = gr.Button("🗑️ Delete Selected", variant="stop")
+                                        
+                                        collection_status = gr.Textbox(label="Status", interactive=False)
+                                        
+                                        # Collection callbacks
+                                        def refresh_collections():
+                                            collections = self.vector_store.list_collections()
+                                            return gr.Dropdown(choices=collections)
+                                        
+                                        def create_collection(name):
+                                            if not name:
+                                                return "⚠️ Please enter a collection name", gr.Dropdown()
+                                            success = self.vector_store.create_collection(name)
+                                            if success:
+                                                collections = self.vector_store.list_collections()
+                                                return f"✅ Created collection: {name}", gr.Dropdown(choices=collections)
+                                            return f"❌ Failed to create collection: {name}", gr.Dropdown()
+                                        
+                                        def switch_collection(name):
+                                            if not name:
+                                                return "⚠️ Please select a collection"
+                                            success = self.vector_store.switch_collection(name)
+                                            if success:
+                                                return f"✅ Switched to collection: {name}"
+                                            return f"❌ Failed to switch to collection: {name}"
+                                        
+                                        def delete_collection(name):
+                                            if not name:
+                                                return "⚠️ Please select a collection", gr.Dropdown()
+                                            if name == self.vector_store.collection_name:
+                                                return "⚠️ Cannot delete active collection", gr.Dropdown()
+                                            success = self.vector_store.delete_collection(name)
+                                            if success:
+                                                collections = self.vector_store.list_collections()
+                                                return f"✅ Deleted collection: {name}", gr.Dropdown(choices=collections)
+                                            return f"❌ Failed to delete collection: {name}", gr.Dropdown()
+                                        
+                                        refresh_collections_btn.click(refresh_collections, outputs=[collections_list])
+                                        create_btn.click(create_collection, inputs=[new_collection_name], outputs=[collection_status, collections_list])
+                                        switch_btn.click(switch_collection, inputs=[collections_list], outputs=[collection_status])
+                                        delete_btn_coll.click(delete_collection, inputs=[collections_list], outputs=[collection_status, collections_list])
+
                             # TAB 2: Chat LAB
                             with gr.TabItem("💬 Chat LAB"):
                                 with gr.Row(elem_classes=["chat-row"]):
@@ -787,6 +862,7 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                         rag_dropdown = gr.Dropdown(
                                             choices=[
                                                 "Naive RAG",
+                                                "Hybrid Search",
                                                 "HyDE (Hypothetical Document Embeddings)",
                                                 "RAG Fusion",
                                                 "None",
