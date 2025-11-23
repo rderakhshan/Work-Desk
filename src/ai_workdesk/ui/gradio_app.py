@@ -13,16 +13,18 @@ Run with: uv run ai-workdesk-ui
 
 import os
 from typing import List, Tuple
-from ai_workdesk.rag.metadata_store import MetadataStore
 import gradio as gr
 from openai import OpenAI
-from ai_workdesk.core.config import get_settings
-from ai_workdesk.tools.llm.ollama_client import OllamaClient
 from loguru import logger
 
-from ai_workdesk import get_auth_manager, get_settings
+from ai_workdesk.core.config import get_settings
+from ai_workdesk import get_auth_manager
+from ai_workdesk.tools.llm.ollama_client import OllamaClient
+from ai_workdesk.rag.metadata_store import MetadataStore
 from ai_workdesk.rag.ingestion import DocumentProcessor
 from ai_workdesk.rag.vector_store import VectorStoreManager
+from ai_workdesk.rag.visualization import EmbeddingVisualizer, estimate_tokens, analyze_cluster_quality
+from ai_workdesk.rag.graph_rag import GraphRAG
 from ai_workdesk.smart_dashboard.ui import render_dashboard, DASHBOARD_CSS
 
 # User credentials (in production, use a database)
@@ -249,6 +251,15 @@ class AIWorkdeskUI:
         
         # Initialize RAG components
         self.doc_processor = DocumentProcessor()
+        
+        # Initialize Visualizer
+        logger.info("Initializing visualizer...")
+        self.visualizer = EmbeddingVisualizer()
+        
+        # Initialize GraphRAG
+        logger.info("Initializing GraphRAG...")
+        self.graph_rag = GraphRAG()
+        
         self._vector_store = None  # Lazy load to avoid blocking on model download
         self.page_size = 20  # Pagination size
 
@@ -386,6 +397,161 @@ class AIWorkdeskUI:
         except Exception as e:
             logger.error(f"Ingestion error: {e}")
             return f"❌ Error during ingestion: {str(e)}"
+
+    def handle_web_ingestion(self, url, depth, chunk_size, chunk_overlap) -> str:
+        """Handle web document ingestion."""
+        if not url:
+            return "⚠️ Please enter a URL."
+            
+        try:
+            # 1. Load Documents
+            documents = self.doc_processor.load_web_documents(url, int(depth))
+            if not documents:
+                return f"⚠️ No documents found at {url}."
+                
+            # 2. Record Metadata (for the main URL)
+            try:
+                self.metadata_store.add_entry(url, 0, ".html")
+            except Exception as e:
+                logger.error(f"Error recording metadata for {url}: {e}")
+
+            # 3. Chunk Documents
+            chunks = self.doc_processor.chunk_documents(
+                documents, 
+                chunk_size=int(chunk_size), 
+                chunk_overlap=int(chunk_overlap)
+            )
+            
+            # 4. Index in Vector Store
+            self.vector_store.add_documents(chunks)
+            
+            return f"✅ Successfully ingested {len(documents)} pages from {url} ({len(chunks)} chunks)!"
+        except Exception as e:
+            logger.error(f"Web ingestion error: {e}")
+            return f"❌ Error during web ingestion: {str(e)}"
+
+    def handle_visualization(self, method, dimension) -> Tuple[str, str, str]:
+        """Handle embedding visualization."""
+        try:
+            # 1. Get all embeddings
+            data = self.vector_store.get_all_embeddings()
+            if not data or not data.get("embeddings"):
+                return "⚠️ No embeddings found in collection.", "", ""
+            
+            embeddings = data["embeddings"]
+            metadatas = data["metadatas"]
+            
+            # Prepare labels
+            labels = []
+            for m in metadatas:
+                labels.append(f"{m.get('filename', 'Unknown')} (Chunk {m.get('chunk_index', '?')})")
+            
+            # 2. Project
+            import numpy as np
+            emb_array = np.array(embeddings)
+            
+            if dimension == "2D":
+                _, plot_html = self.visualizer.project_embeddings_2d(emb_array, labels, method.lower())
+            else:
+                _, plot_html = self.visualizer.project_embeddings_3d(emb_array, labels, method.lower())
+                
+            # 3. Analyze Quality
+            quality_metrics = analyze_cluster_quality(emb_array)
+            
+            # Format metrics markdown
+            if "error" in quality_metrics:
+                metrics_md = f"### ⚠️ Quality Analysis Error\n{quality_metrics['error']}"
+            else:
+                metrics_md = f"""### 📊 Cluster Quality Analysis
+- **Quality**: {quality_metrics['quality']}
+- **Silhouette Score**: {quality_metrics['silhouette_score']}
+- **Davies-Bouldin Score**: {quality_metrics['davies_bouldin_score']}
+- **Estimated Clusters**: {quality_metrics['n_clusters']}
+
+*{quality_metrics['interpretation']}*
+"""
+            
+            return f"✅ Generated {dimension} {method} projection for {len(embeddings)} chunks.", plot_html, metrics_md
+            
+        except Exception as e:
+            logger.error(f"Visualization error: {e}")
+            return f"❌ Error: {str(e)}", "", ""
+
+    def handle_token_estimation(self, files) -> str:
+        """Handle token and cost estimation."""
+        total_tokens = 0
+        total_cost = 0.0
+        details = []
+        
+        try:
+            # 1. Estimate from Files
+            if files:
+                for f in files:
+                    # Simple text extraction for estimation (this is an approximation)
+                    try:
+                        with open(f.name, "r", encoding="utf-8", errors="ignore") as file:
+                            content = file.read()
+                            tokens, cost = estimate_tokens(content)
+                            total_tokens += tokens
+                            total_cost += cost
+                            details.append(f"- {os.path.basename(f.name)}: ~{tokens} tokens (${cost:.4f})")
+                    except Exception as e:
+                        details.append(f"- {os.path.basename(f.name)}: Error reading file")
+            
+            if total_tokens == 0:
+                return "⚠️ No content to estimate."
+                
+            summary = f"""### 💰 Estimation Result
+**Total Tokens**: ~{total_tokens:,}
+**Estimated Cost (GPT-4)**: ${total_cost:.4f}
+
+**Breakdown:**
+{chr(10).join(details)}
+"""
+            return summary
+            
+        except Exception as e:
+            logger.error(f"Estimation error: {e}")
+            return f"❌ Error during estimation: {str(e)}"
+
+    def handle_graph_generation(self) -> Tuple[str, str, str]:
+        """Handle knowledge graph generation."""
+        try:
+            # 1. Get all documents
+            data = self.vector_store.get_all_embeddings()
+            if not data or not data.get("documents"):
+                return "⚠️ No documents found in collection.", "", ""
+            
+            documents = data["documents"]
+            
+            # 2. Build Graph
+            self.graph_rag.build_graph(documents)
+            
+            # 3. Visualize
+            graph_path = self.graph_rag.visualize_graph()
+            
+            # 4. Get Stats
+            stats = self.graph_rag.get_graph_stats()
+            stats_md = f"""### 🕸️ Graph Statistics
+- **Nodes**: {stats['nodes']}
+- **Edges**: {stats['edges']}
+- **Density**: {stats['density']:.4f}
+- **Components**: {stats['components']}
+"""
+            
+            # Read HTML content for display
+            if graph_path and os.path.exists(graph_path):
+                with open(graph_path, "r", encoding="utf-8") as f:
+                    graph_html = f.read()
+                # Clean up temp file? Maybe keep it for now or let OS handle it
+                # os.remove(graph_path) 
+                return f"✅ Graph built with {stats['nodes']} nodes and {stats['edges']} edges.", graph_html, stats_md
+            else:
+                return "❌ Failed to generate graph visualization.", "", ""
+                
+        except Exception as e:
+            logger.error(f"Graph generation error: {e}")
+            return f"❌ Error: {str(e)}", "", ""
 
     def chat_with_ai(self, message, history, model, rag_technique, database, temperature, max_tokens, top_k, similarity_threshold, chunk_size, chunk_overlap, use_reranker, system_prompt):
         """Chat with AI using RAG."""
@@ -666,28 +832,58 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                 with gr.Tabs():
                                     with gr.TabItem("📤 Ingestion"):
                                         gr.Markdown("### 📄 Document Ingestion")
-                                        file_input = gr.File(
-                                            file_count="multiple", 
-                                            label="Upload Documents (TXT, PDF, MD, DOCX, CSV, JSON, HTML, PPTX, XLSX)"
-                                        )
-                                        with gr.Row():
-                                            ingest_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
-                                            ingest_chunk_overlap = gr.Slider(0, 200, 50, step=10, label="Overlap")
                                         
-                                        chunking_strategy = gr.Dropdown(
-                                            choices=["Fixed Size", "Semantic"],
-                                            value="Fixed Size",
-                                            label="Chunking Strategy"
-                                        )
-                                        
-                                        ingest_btn = gr.Button("🚀 Ingest Documents", variant="primary", elem_classes=["primary-btn"])
-                                        ingest_status = gr.Textbox(label="Status", interactive=False)
-                                        
-                                        ingest_btn.click(
-                                            self.handle_ingestion,
-                                            inputs=[file_input, ingest_chunk_size, ingest_chunk_overlap, chunking_strategy],
-                                            outputs=[ingest_status]
-                                        )
+                                        with gr.Tabs():
+                                            with gr.TabItem("📄 Files"):
+                                                file_input = gr.File(
+                                                    file_count="multiple", 
+                                                    label="Upload Documents (TXT, PDF, MD, DOCX, CSV, JSON, HTML, PPTX, XLSX)"
+                                                )
+                                                with gr.Row():
+                                                    ingest_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
+                                                    ingest_chunk_overlap = gr.Slider(0, 200, 50, step=10, label="Overlap")
+                                                
+                                                chunking_strategy = gr.Dropdown(
+                                                    choices=["Fixed Size", "Semantic"],
+                                                    value="Fixed Size",
+                                                    label="Chunking Strategy"
+                                                )
+                                                
+                                                with gr.Row():
+                                                    estimate_btn = gr.Button("💰 Estimate Cost", variant="secondary")
+                                                    ingest_btn = gr.Button("🚀 Ingest Documents", variant="primary", elem_classes=["primary-btn"])
+                                                
+                                                ingest_status = gr.Textbox(label="Status", interactive=False)
+                                                
+                                                estimate_btn.click(
+                                                    self.handle_token_estimation,
+                                                    inputs=[file_input],
+                                                    outputs=[ingest_status]
+                                                )
+                                                
+                                                ingest_btn.click(
+                                                    self.handle_ingestion,
+                                                    inputs=[file_input, ingest_chunk_size, ingest_chunk_overlap, chunking_strategy],
+                                                    outputs=[ingest_status]
+                                                )
+
+                                            with gr.TabItem("🌐 Web"):
+                                                gr.Markdown("### 🕸️ Web Crawler")
+                                                web_url = gr.Textbox(label="URL", placeholder="https://example.com")
+                                                web_depth = gr.Slider(0, 5, value=1, step=1, label="Crawl Depth")
+                                                
+                                                with gr.Row():
+                                                    web_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
+                                                    web_chunk_overlap = gr.Slider(0, 200, 50, step=10, label="Overlap")
+                                                
+                                                web_ingest_btn = gr.Button("🚀 Crawl & Ingest", variant="primary")
+                                                web_status = gr.Textbox(label="Status", interactive=False)
+                                                
+                                                web_ingest_btn.click(
+                                                    self.handle_web_ingestion,
+                                                    inputs=[web_url, web_depth, web_chunk_size, web_chunk_overlap],
+                                                    outputs=[web_status]
+                                                )
 
                                     with gr.TabItem("📋 Metadata"):
                                         gr.Markdown("### 🗄️ Ingested Files")
@@ -812,6 +1008,58 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                         create_btn.click(create_collection, inputs=[new_collection_name], outputs=[collection_status, collections_list])
                                         switch_btn.click(switch_collection, inputs=[collections_list], outputs=[collection_status])
                                         delete_btn_coll.click(delete_collection, inputs=[collections_list], outputs=[collection_status, collections_list])
+
+                                    with gr.TabItem("📊 Visualization"):
+                                        gr.Markdown("### 🔮 Embedding Projector")
+                                        gr.Markdown("*Visualize your document embeddings in 2D or 3D space*")
+                                        
+                                        with gr.Row():
+                                            with gr.Column(scale=1):
+                                                viz_method = gr.Dropdown(
+                                                    choices=["UMAP", "t-SNE"], 
+                                                    value="UMAP", 
+                                                    label="Projection Method"
+                                                )
+                                                viz_dim = gr.Radio(
+                                                    choices=["2D", "3D"], 
+                                                    value="2D", 
+                                                    label="Dimension"
+                                                )
+                                                viz_btn = gr.Button("🎨 Generate Projection", variant="primary")
+                                                viz_status = gr.Textbox(label="Status", interactive=False)
+                                                
+                                                # Quality Metrics
+                                                quality_md = gr.Markdown("### 📊 Quality Metrics\n*Generate projection to see metrics*")
+                                                
+                                            with gr.Column(scale=3):
+                                                viz_plot = gr.HTML(label="Projection Plot", min_height=600)
+                                        
+                                        viz_btn.click(
+                                            self.handle_visualization,
+                                            inputs=[viz_method, viz_dim],
+                                            outputs=[viz_status, viz_plot, quality_md]
+                                        )
+
+                                    with gr.TabItem("🕸️ Knowledge Graph"):
+                                        gr.Markdown("### 🔗 Entity Knowledge Graph")
+                                        gr.Markdown("*Visualize relationships between entities (People, Organizations, Locations) in your documents*")
+                                        
+                                        with gr.Row():
+                                            with gr.Column(scale=1):
+                                                graph_btn = gr.Button("🕸️ Generate Graph", variant="primary")
+                                                graph_status = gr.Textbox(label="Status", interactive=False)
+                                                
+                                                # Graph Stats
+                                                graph_stats_md = gr.Markdown("### 📊 Graph Statistics\n*Generate graph to see stats*")
+                                                
+                                            with gr.Column(scale=3):
+                                                graph_plot = gr.HTML(label="Knowledge Graph", min_height=600)
+                                        
+                                        graph_btn.click(
+                                            self.handle_graph_generation,
+                                            inputs=[],
+                                            outputs=[graph_status, graph_plot, graph_stats_md]
+                                        )
 
                             # TAB 2: RAG LAB
                             with gr.TabItem("🧠 RAG LAB"):

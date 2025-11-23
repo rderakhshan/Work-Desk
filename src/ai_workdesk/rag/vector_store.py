@@ -247,3 +247,14 @@ class VectorStoreManager:
         except Exception as e:
             logger.error(f"Error deleting collection {collection_name}: {e}")
             return False
+
+    def get_all_embeddings(self) -> dict:
+        """Retrieve all embeddings and metadata from the current collection."""
+        try:
+            collection = self.client.get_collection(self.collection_name)
+            # Fetch all data including embeddings
+            results = collection.get(include=["embeddings", "metadatas", "documents"])
+            return results
+        except Exception as e:
+            logger.error(f"Error retrieving embeddings: {e}")
+            return {}

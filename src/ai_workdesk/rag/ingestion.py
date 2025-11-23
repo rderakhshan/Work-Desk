@@ -11,8 +11,10 @@ from langchain_community.document_loaders import (
     JSONLoader,
     UnstructuredHTMLLoader,
     UnstructuredPowerPointLoader,
-    UnstructuredExcelLoader
+    UnstructuredExcelLoader,
+    RecursiveUrlLoader
 )
+from bs4 import BeautifulSoup
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
@@ -66,6 +68,41 @@ class DocumentProcessor:
                 logger.error(f"Error loading {file_path}: {e}")
 
         return documents
+
+    def load_web_documents(self, url: str, max_depth: int = 2) -> List[Document]:
+        """
+        Load documents from a web URL with recursive crawling.
+        
+        Args:
+            url: The starting URL.
+            max_depth: Maximum depth for recursive crawling.
+            
+        Returns:
+            List of LangChain Documents.
+        """
+        try:
+            logger.info(f"Crawling {url} with depth {max_depth}...")
+            
+            def simple_extractor(html):
+                soup = BeautifulSoup(html, "html.parser")
+                return soup.get_text().strip()
+
+            loader = RecursiveUrlLoader(
+                url=url,
+                max_depth=max_depth,
+                extractor=simple_extractor,
+                prevent_outside=True,
+                use_async=True,
+                timeout=10,
+            )
+            
+            docs = loader.load()
+            logger.info(f"Crawled {len(docs)} pages from {url}")
+            return docs
+            
+        except Exception as e:
+            logger.error(f"Error crawling {url}: {e}")
+            return []
 
     def chunk_documents(
         self, 
