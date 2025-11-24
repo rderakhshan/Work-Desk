@@ -12,10 +12,11 @@ Run with: uv run ai-workdesk-ui
 """
 
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Any
 import gradio as gr
 from openai import OpenAI
 from loguru import logger
+from langchain_core.documents import Document
 
 from ai_workdesk.core.config import get_settings
 from ai_workdesk import get_auth_manager
@@ -338,7 +339,7 @@ class AIWorkdeskUI:
             
         return "\n".join(status)
 
-    def load_metadata(self, page: int = 1) -> Tuple[List[List], int]:
+    def load_metadata(self, page: int = 1) -> Tuple[List[List], Any]:
         """Load metadata entries for the specified page, showing only unique filenames."""
         # Ensure page is at least 1
         page = max(1, int(page))
@@ -365,11 +366,11 @@ class AIWorkdeskUI:
         # Format for Dataframe
         data = []
         for e in paginated_entries:
-            data.append([e["id"], e["filename"], e["size"], e["upload_ts"], e["doc_type"]])
+            data.append([e["id"], e["filename"], e["size"], e["upload_ts"], e["doc_type"], e.get("summary", "")])
             
-        return data, max_page
+        return data, gr.update(maximum=max_page, value=min(page, max_page), step=1)
 
-    def delete_metadata(self, entry_id: float, page: int) -> Tuple[List[List], int]:
+    def delete_metadata(self, entry_id: float, page: int) -> Tuple[List[List], Any]:
         """Delete a metadata entry and refresh the list."""
         if entry_id is not None and entry_id > 0:
             self.metadata_store.delete_entry(int(entry_id))
@@ -448,6 +449,199 @@ class AIWorkdeskUI:
         except Exception as e:
             logger.error(f"Web ingestion error: {e}")
             return f"❌ Error during web ingestion: {str(e)}"
+
+    def handle_youtube_ingestion(
+        self, 
+        urls: str, 
+        chunk_size: int, 
+        chunk_overlap: int,
+        generate_summary: bool,
+        support_playlists: bool
+    ) -> str:
+        """
+        Handle YouTube video ingestion with all advanced features.
+        
+        Features:
+        - Batch processing of multiple videos
+        - Playlist expansion support
+        - Auto-summary generation
+        - Timestamp preservation for citations
+        - Full metadata tracking
+        """
+        if not urls.strip():
+            return "⚠️ Please enter at least one YouTube URL"
+        
+        try:
+            from ai_workdesk.rag.youtube_loader import YouTubeTranscriptLoader
+            
+            # Parse URLs
+            url_list = [url.strip() for url in urls.split('\n') if url.strip()]
+            logger.info(f"Processing {len(url_list)} URL(s)")
+            
+            # Expand playlists if enabled
+            final_urls = []
+            loader = YouTubeTranscriptLoader()
+            
+            for url in url_list:
+                if support_playlists and loader._is_playlist_url(url):
+                    logger.info(f"Detected playlist URL: {url}")
+                    playlist_videos = loader.extract_playlist_videos(url)
+                    if playlist_videos:
+                        final_urls.extend(playlist_videos)
+                        logger.info(f"Expanded playlist to {len(playlist_videos)} videos")
+                    else:
+                        return f"⚠️ Could not extract videos from playlist: {url}"
+                else:
+                    final_urls.append(url)
+            
+            if not final_urls:
+                return "⚠️ No valid video URLs found"
+            
+            logger.info(f"Processing {len(final_urls)} total video(s)")
+            
+            # Load YouTube documents (already chunked with timestamps)
+            documents = self.doc_processor.load_youtube_documents(final_urls)
+            
+            if not documents:
+                return "❌ No transcripts could be fetched. Please check:\n• Video has captions enabled\n• Video is not private\n• URL is correct"
+            
+            # Group documents by video for summary generation
+            videos_by_id = {}
+            for doc in documents:
+                video_id = doc.metadata.get('video_id')
+                if video_id not in videos_by_id:
+                    videos_by_id[video_id] = {
+                        'documents': [],
+                        'metadata': doc.metadata
+                    }
+                videos_by_id[video_id]['documents'].append(doc)
+            
+            # Generate summaries if enabled
+            summaries_by_id = {}
+            if generate_summary:
+                try:
+                    from ai_workdesk.rag.youtube_summarizer import YouTubeSummarizer
+                    from ai_workdesk.tools.llm.ollama_client import OllamaClient
+                    
+                    # Use Ollama for summarization
+                    llm_client = OllamaClient(
+                        model="deepseek-r1:7b",
+                        temperature=0.3,
+                        max_tokens=300
+                    )
+                    summarizer = YouTubeSummarizer(llm_client)
+                    
+                    for video_id, video_data in videos_by_id.items():
+                        # Combine all chunks for this video
+                        full_transcript = ' '.join([doc.page_content for doc in video_data['documents']])
+                        video_title = video_data['metadata'].get('source', 'Unknown')
+                        channel = video_data['metadata'].get('channel')
+                        
+                        logger.info(f"Generating summary for: {video_title}")
+                        summary = summarizer.summarize(
+                            full_transcript, 
+                            video_title,
+                            channel=channel
+                        )
+                        summaries_by_id[video_id] = summary
+                        
+                        # Add summary to metadata for all chunks of this video
+                        for doc in video_data['documents']:
+                            doc.metadata['summary'] = summary
+                    
+                except Exception as e:
+                    logger.error(f"Error generating summaries: {e}")
+                    # Continue without summaries
+            
+            # Store in vector database
+            self.vector_store.add_documents(documents)
+            logger.info(f"Stored {len(documents)} chunks in vector database")
+            
+            # Index summaries as separate documents if enabled
+            if generate_summary and summaries_by_id:
+                summary_docs = []
+                for video_id, summary in summaries_by_id.items():
+                    video_data = videos_by_id[video_id]
+                    video_title = video_data['metadata'].get('source', 'Unknown')
+                    url = video_data['metadata'].get('url', '')
+                    
+                    summary_doc = Document(
+                        page_content=f"Summary of '{video_title}':\n\n{summary}",
+                        metadata={
+                            'source': f"Summary: {video_title}",
+                            'video_id': video_id,
+                            'url': url,
+                            'document_type': 'youtube_summary',
+                            'type': 'summary'
+                        }
+                    )
+                    summary_docs.append(summary_doc)
+                
+                if summary_docs:
+                    self.vector_store.add_documents(summary_docs)
+                    logger.info(f"Stored {len(summary_docs)} summary documents in vector database")
+            
+            # Save metadata for each unique video
+            for video_id, video_data in videos_by_id.items():
+                metadata = video_data['metadata']
+                
+                # Calculate total transcript length for this video
+                total_length = sum(len(doc.page_content) for doc in video_data['documents'])
+                
+                try:
+                    self.metadata_store.add_entry(
+                        filename=metadata['source'],  # Video title
+                        size=total_length,
+                        doc_type='youtube',
+                        summary=summaries_by_id.get(video_id, ''),
+                        metadata={
+                            'video_id': video_id,
+                            'channel': metadata.get('channel', 'Unknown'),
+                            'duration': metadata.get('duration', 0),
+                            'url': metadata['url'],
+                            'upload_date': metadata.get('upload_date', '')
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error saving metadata for {video_id}: {e}")
+            
+            # Build success message
+            status_lines = [f"✅ Successfully processed {len(videos_by_id)} video(s):\n"]
+            
+            for video_id, video_data in videos_by_id.items():
+                metadata = video_data['metadata']
+                title = metadata['source']
+                channel = metadata.get('channel', 'Unknown')
+                duration = metadata.get('duration', 0)
+                
+                # Format duration as HH:MM:SS
+                hours = int(duration // 3600)
+                minutes = int((duration % 3600) // 60)
+                seconds = int(duration % 60)
+                duration_str = f"{hours}:{minutes:02d}:{seconds:02d}" if hours > 0 else f"{minutes}:{seconds:02d}"
+                
+                status_lines.append(f"\n📹 **{title}**")
+                status_lines.append(f"   Channel: {channel} | Duration: {duration_str}")
+                
+                # Add summary if generated
+                if video_id in summaries_by_id:
+                    summary = summaries_by_id[video_id]
+                    status_lines.append(f"   💡 _{summary}_")
+            
+            status_lines.append(f"\n\n📊 **Statistics:**")
+            status_lines.append(f"   • Total chunks created: {len(documents)}")
+            status_lines.append(f"   • Chunk size: {chunk_size} | Overlap: {chunk_overlap}")
+            status_lines.append(f"   • Timestamp citations: ✅ Enabled")
+            status_lines.append(f"\n💾 Stored in vector database")
+            status_lines.append(f"🎯 Ready for chat in RAG LAB with clickable timestamp links!")
+            
+            return "\n".join(status_lines)
+            
+        except Exception as e:
+            logger.error(f"YouTube ingestion error: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"❌ Error: {str(e)}\n\nPlease check the logs for details."
 
     def handle_visualization(self, method, dimension) -> Tuple[str, str, str]:
         """Handle embedding visualization."""
@@ -705,7 +899,27 @@ class AIWorkdeskUI:
                                 source_info = source_info.split('/')[-1].split('\\')[-1]
                             
                             context_parts.append(f"[Document {i}]\n{doc.page_content}\n")
-                            sources.append(f"[{i}] {source_info}")
+                            
+                            # Check if this is a YouTube video with timestamp
+                            if doc.metadata.get('document_type') == 'youtube':
+                                start_time = doc.metadata.get('start_time')
+                                if start_time is not None:
+                                    # Format timestamp as MM:SS or HH:MM:SS
+                                    hours = int(start_time // 3600)
+                                    minutes = int((start_time % 3600) // 60)
+                                    secs = int(start_time % 60)
+                                    
+                                    if hours > 0:
+                                        timestamp_str = f"{hours}:{minutes:02d}:{secs:02d}"
+                                    else:
+                                        timestamp_str = f"{minutes}:{secs:02d}"
+                                    
+                                    timestamp_url = doc.metadata.get('timestamp_url', doc.metadata.get('url', ''))
+                                    sources.append(f"[{i}] [{source_info}]({timestamp_url}) at {timestamp_str}")
+                                else:
+                                    sources.append(f"[{i}] {source_info} (YouTube)")
+                            else:
+                                sources.append(f"[{i}] {source_info}")
                         
                         context = "\n".join(context_parts)
                         logger.info(f"Retrieved {len(retrieved_docs)} documents using {rag_technique}")
@@ -821,6 +1035,163 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
         logger.info(f"Chat exported to {file_path}")
         return str(file_path)
 
+    def chat_with_attached_document(
+        self, 
+        message, 
+        history, 
+        attached_file, 
+        model, 
+        temperature, 
+        max_tokens, 
+        chunk_size, 
+        chunk_overlap,
+        system_prompt
+    ):
+        """
+        Chat with AI using only the attached document as context.
+        
+        This method processes the attached file on-the-fly and queries only that document,
+        not the entire vector store.
+        """
+        if not message:
+            return history, ""
+        
+        if not attached_file:
+            # No file attached, show error
+            error_msg = "⚠️ No document attached. Please attach a file to chat with it, or use regular RAG LAB chat."
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": error_msg})
+            return history, ""
+        
+        try:
+            # Step 1: Load the attached document
+            file_path = attached_file.name if hasattr(attached_file, 'name') else attached_file
+            documents = self.doc_processor.load_documents([file_path])
+            
+            if not documents:
+                error_msg = f"❌ Could not load document: {os.path.basename(file_path)}"
+                history.append({"role": "user", "content": message})
+                history.append({"role": "assistant", "content": error_msg})
+                return history, ""
+            
+            # Step 2: Chunk the document
+            chunks = self.doc_processor.chunk_documents(
+                documents,
+                chunk_size=int(chunk_size),
+                chunk_overlap=int(chunk_overlap)
+            )
+            
+            logger.info(f"Loaded {len(chunks)} chunks from attached document")
+            
+            # Step 3: Simple similarity search using embeddings (in-memory)
+            # We'll use a simple approach: embed all chunks and find most similar to query
+            from sentence_transformers import SentenceTransformer
+            import numpy as np
+            
+            # Use lightweight model for quick processing
+            embedder = SentenceTransformer('all-MiniLM-L6-v2')
+            
+            # Embed query
+            query_embedding = embedder.encode([message])[0]
+            
+            # Embed all chunks
+            chunk_texts = [chunk.page_content for chunk in chunks]
+            chunk_embeddings = embedder.encode(chunk_texts)
+            
+            # Calculate cosine similarity
+            similarities = np.dot(chunk_embeddings, query_embedding) / (
+                np.linalg.norm(chunk_embeddings, axis=1) * np.linalg.norm(query_embedding)
+            )
+            
+            # Get top 5 most similar chunks
+            top_k = 5
+            top_indices = np.argsort(similarities)[-top_k:][::-1]
+            
+            # Build context from top chunks
+            context_parts = []
+            for i, idx in enumerate(top_indices, 1):
+                chunk = chunks[idx]
+                similarity_score = similarities[idx]
+                
+                # Only include chunks with reasonable similarity (> 0.3)
+                if similarity_score > 0.3:
+                    context_parts.append(f"[Chunk {i}] {chunk.page_content}")
+            
+            if not context_parts:
+                context = "No relevant content found in the attached document for your query."
+            else:
+                context = "\n\n".join(context_parts)
+            
+            # Step 4: Build prompt
+            if not system_prompt:
+                system_prompt = "You are a helpful AI assistant. Answer questions based on the provided document context."
+            
+            full_prompt = f"""Context from attached document:
+{context}
+
+User Question: {message}
+
+Please answer the question based on the context from the attached document. If the answer is not in the document, say so."""
+            
+            # Step 5: Call LLM
+            response = ""
+            if model.lower().startswith("gpt"):
+                if not self.openai_client:
+                    response = "❌ OpenAI client not initialized. Please check your API key in .env"
+                else:
+                    try:
+                        completion = self.openai_client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": full_prompt}
+                            ],
+                            temperature=float(temperature),
+                            max_tokens=int(max_tokens)
+                        )
+                        response = completion.choices[0].message.content
+                    except Exception as e:
+                        logger.error(f"OpenAI error: {e}")
+                        response = f"❌ OpenAI Error: {str(e)}"
+            else:
+                # Use Ollama
+                try:
+                    ollama_client = OllamaClient(
+                        model=model,
+                        temperature=float(temperature),
+                        max_tokens=int(max_tokens)
+                    )
+                    response = ollama_client.chat(full_prompt)
+                except Exception as e:
+                    logger.error(f"Ollama error: {e}")
+                    response = f"❌ Ollama Error: {str(e)}\n\nMake sure Ollama is running and the model '{model}' is available."
+            
+            # Step 6: Add source citation
+            filename = os.path.basename(file_path)
+            response += f"\n\n---\n**📎 Source:** {filename} (attached document)"
+            
+            # Step 7: Update history
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": response})
+            return history, ""
+            
+        except Exception as e:
+            logger.error(f"Attached document chat error: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Check for our specific OCR error
+            error_msg = str(e)
+            if "Tesseract OCR" in error_msg:
+                error_msg = f"❌ **OCR Required**: {error_msg}"
+            else:
+                error_msg = f"❌ Error processing attached document: {str(e)}"
+                
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": error_msg})
+            return history, ""
+
+
 
     def create_interface(self) -> gr.Blocks:
         """Create the Gradio interface."""
@@ -881,7 +1252,12 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                             with gr.TabItem("📄 Files"):
                                                 file_input = gr.File(
                                                     file_count="multiple", 
-                                                    label="Upload Documents (TXT, PDF, MD, DOCX, CSV, JSON, HTML, PPTX, XLSX)"
+                                                    label="Upload Documents (TXT, PDF, MD, DOCX, CSV, JSON, HTML, PPTX, XLSX) + Images (PNG, JPG, TIFF) with OCR",
+                                                    file_types=[
+                                                        ".txt", ".pdf", ".md", ".docx", ".csv", ".json",
+                                                        ".html", ".htm", ".pptx", ".xlsx", ".xls",
+                                                        ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif"
+                                                    ]
                                                 )
                                                 with gr.Row():
                                                     ingest_chunk_size = gr.Dropdown([256, 512, 1024], value=512, label="Chunk Size")
@@ -929,12 +1305,59 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                                     outputs=[web_status]
                                                 )
 
+                                            with gr.TabItem("🎥 YouTube"):
+                                                gr.Markdown("### 🎬 YouTube Video Ingestion")
+                                                gr.Markdown("*Chat with YouTube videos by ingesting their transcripts with timestamp citations*")
+                                                
+                                                youtube_url = gr.Textbox(
+                                                    label="YouTube Video URL(s)",
+                                                    placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ\n(one URL per line for batch processing)",
+                                                    lines=3
+                                                )
+                                                
+                                                with gr.Row():
+                                                    yt_chunk_size = gr.Dropdown(
+                                                        [256, 512, 1024], 
+                                                        value=512, 
+                                                        label="Chunk Size"
+                                                    )
+                                                    yt_chunk_overlap = gr.Slider(
+                                                        0, 200, 50, 
+                                                        step=10, 
+                                                        label="Overlap"
+                                                    )
+                                                
+                                                with gr.Row():
+                                                    generate_summary = gr.Checkbox(
+                                                        label="🤖 Auto-Generate Summary", 
+                                                        value=True,
+                                                        info="Generate AI summary of each video"
+                                                    )
+                                                    support_playlists = gr.Checkbox(
+                                                        label="📚 Support Playlists", 
+                                                        value=False,
+                                                        info="Process all videos in playlist URLs"
+                                                    )
+                                                
+                                                yt_ingest_btn = gr.Button(
+                                                    "🚀 Process Videos", 
+                                                    variant="primary",
+                                                    elem_classes=["primary-btn"]
+                                                )
+                                                yt_status = gr.Textbox(label="Status", interactive=False, lines=8)
+                                                
+                                                yt_ingest_btn.click(
+                                                    self.handle_youtube_ingestion,
+                                                    inputs=[youtube_url, yt_chunk_size, yt_chunk_overlap, generate_summary, support_playlists],
+                                                    outputs=[yt_status]
+                                                )
+
                                     with gr.TabItem("📋 Metadata"):
                                         gr.Markdown("### 🗄️ Ingested Files")
                                         gr.Markdown("*Showing unique documents (most recent version)*")
                                         
                                         metadata_df = gr.Dataframe(
-                                            headers=["ID", "Filename", "Size (bytes)", "Uploaded", "Type"],
+                                            headers=["ID", "Filename", "Size (bytes)", "Uploaded", "Type", "Summary"],
                                             label="Document Metadata",
                                             interactive=False,
                                             wrap=True
@@ -1119,6 +1542,25 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                             render_markdown=True,
                                         )
 
+                                        # File attachment component
+                                        with gr.Row():
+                                            attached_file = gr.File(
+                                                label="📎 Attach Document (Optional - Chat with specific file)",
+                                                file_types=[
+                                                    ".txt", ".pdf", ".md", ".docx", ".csv", ".json",
+                                                    ".html", ".htm", ".pptx", ".xlsx", ".xls",
+                                                    ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif"
+                                                ],
+                                                type="filepath",
+                                                scale=4
+                                            )
+                                            clear_file_btn = gr.Button(
+                                                "🗑️ Clear File", 
+                                                variant="secondary", 
+                                                elem_classes=["secondary-btn"],
+                                                scale=1
+                                            )
+
                                         with gr.Row():
                                             msg = gr.Textbox(
                                                 label="Message",
@@ -1136,6 +1578,7 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                                 )
                                             with gr.Column(scale=1):
                                                 download_btn = gr.Button("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
+
 
 
                                     with gr.Column(scale=2, elem_classes=["glass-panel"]):
@@ -1237,11 +1680,61 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                             )
 
                         # Chat interaction handlers
+                                # Create a wrapper function to route between attached doc chat and regular RAG chat
+                                def chat_router(
+                                    message, 
+                                    history, 
+                                    attached_file,
+                                    model, 
+                                    rag_technique, 
+                                    database, 
+                                    temperature, 
+                                    max_tokens, 
+                                    top_k, 
+                                    similarity_threshold, 
+                                    chunk_size, 
+                                    chunk_overlap, 
+                                    use_reranker, 
+                                    system_prompt
+                                ):
+                                    """Route to appropriate chat handler based on whether a file is attached."""
+                                    if attached_file:
+                                        # Chat with attached document only
+                                        return self.chat_with_attached_document(
+                                            message,
+                                            history,
+                                            attached_file,
+                                            model,
+                                            temperature,
+                                            max_tokens,
+                                            chunk_size,
+                                            chunk_overlap,
+                                            system_prompt
+                                        )
+                                    else:
+                                        # Regular RAG chat with full vector store
+                                        return self.chat_with_ai(
+                                            message,
+                                            history,
+                                            model,
+                                            rag_technique,
+                                            database,
+                                            temperature,
+                                            max_tokens,
+                                            top_k,
+                                            similarity_threshold,
+                                            chunk_size,
+                                            chunk_overlap,
+                                            use_reranker,
+                                            system_prompt
+                                        )
+                                
                                 msg.submit(
-                                    self.chat_with_ai,
+                                    chat_router,
                                     [
                                         msg,
                                         chatbot,
+                                        attached_file,
                                         model_dropdown,
                                         rag_dropdown,
                                         database_dropdown,
@@ -1258,10 +1751,11 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                 )
 
                                 send_btn.click(
-                                    self.chat_with_ai,
+                                    chat_router,
                                     [
                                         msg,
                                         chatbot,
+                                        attached_file,
                                         model_dropdown,
                                         rag_dropdown,
                                         database_dropdown,
@@ -1288,7 +1782,11 @@ IMPORTANT: When answering, cite your sources using inline citations like [1], [2
                                     outputs=[model_dropdown]
                                 )
 
-                                clear_btn.click(lambda: ([], ""), None, [chatbot, msg])
+                                # Clear file button
+                                clear_file_btn.click(lambda: None, None, [attached_file])
+                                
+                                # Clear chat button - also clears attached file
+                                clear_btn.click(lambda: ([], "", None), None, [chatbot, msg, attached_file])
                                 
                                 # Download with JavaScript to trigger browser Save As dialog
                                 download_btn.click(
