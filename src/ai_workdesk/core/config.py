@@ -85,6 +85,25 @@ class Settings(BaseSettings):
     max_retries: int = Field(3, ge=0, description="Maximum number of retries")
     retry_delay: int = Field(1, ge=0, description="Retry delay in seconds")
 
+    # =============================================================================
+    # AUDIO PROCESSING (Speech-to-Text & Text-to-Speech)
+    # =============================================================================
+    # Whisper STT Configuration
+    whisper_model_size: str = Field(
+        "base", description="Whisper model size (tiny, base, small, medium, large)"
+    )
+    whisper_device: str = Field("cpu", description="Device for Whisper (cpu or cuda)")
+    whisper_compute_type: str = Field(
+        "int8", description="Compute type for Whisper (int8, float16, float32)"
+    )
+    
+    # TTS Configuration
+    tts_engine: str = Field("pyttsx3", description="TTS engine (pyttsx3 or gtts)")
+    tts_voice_id: Optional[str] = Field(None, description="Voice ID for pyttsx3")
+    tts_rate: int = Field(150, gt=0, description="Speech rate in words per minute")
+    tts_volume: float = Field(1.0, ge=0.0, le=1.0, description="Volume level (0.0 to 1.0)")
+
+
     @field_validator("log_file", "chroma_persist_directory", mode="before")
     @classmethod
     def ensure_path(cls, v: str | Path) -> Path:

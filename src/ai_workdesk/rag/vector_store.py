@@ -58,7 +58,7 @@ class VectorStoreManager:
         try:
             if not chunks:
                 return False
-            self.vector_store.add_documents(documents=chunks)
+            self.vector_store.add_documents(chunks)
             # Log collection stats
             collection = self.client.get_collection(self.collection_name)
             count = collection.count()

@@ -136,19 +136,21 @@ class DocumentProcessor:
                 raise e
             raise  # Re-raise other errors to be caught by the caller
 
-    def load_web_documents(self, url: str, max_depth: int = 2) -> List[Document]:
+    def load_web_documents(self, url: str, max_depth: int = 2, timeout: int = 120, max_pages: int = 100) -> List[Document]:
         """
         Load documents from a web URL with recursive crawling.
         
         Args:
             url: The starting URL.
-            max_depth: Maximum depth for recursive crawling.
+            max_depth: Maximum depth for recursive crawling (0 = single page only).
+            timeout: Timeout in seconds for each page request.
+            max_pages: Maximum number of pages to crawl (prevents overwhelming sites).
             
         Returns:
             List of LangChain Documents.
         """
         try:
-            logger.info(f"Crawling {url} with depth {max_depth}...")
+            logger.info(f"Crawling {url} with depth {max_depth}, timeout {timeout}s, max {max_pages} pages...")
             
             def simple_extractor(html):
                 soup = BeautifulSoup(html, "html.parser")
@@ -160,15 +162,22 @@ class DocumentProcessor:
                 extractor=simple_extractor,
                 prevent_outside=True,
                 use_async=True,
-                timeout=10,
+                timeout=timeout,
             )
             
             docs = loader.load()
-            logger.info(f"Crawled {len(docs)} pages from {url}")
+            
+            # Limit number of pages if too many were crawled
+            if len(docs) > max_pages:
+                logger.warning(f"Crawled {len(docs)} pages, limiting to {max_pages} pages")
+                docs = docs[:max_pages]
+            
+            logger.info(f"Successfully crawled {len(docs)} pages from {url}")
             return docs
             
         except Exception as e:
             logger.error(f"Error crawling {url}: {e}")
+            logger.warning(f"Tip: Try reducing max_depth (current: {max_depth}) or increase timeout (current: {timeout}s)")
             return []
 
     def load_youtube_documents(self, video_urls: List[str]) -> List[Document]:
@@ -266,3 +275,48 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error in semantic chunking: {e}. Falling back to fixed-size chunking.")
             return self.chunk_documents(documents)
+
+    def process_files(self, file_paths: List[str], chunk_size: int = 512, chunk_overlap: int = 50, strategy: str = "Fixed Size") -> List[Document]:
+        """
+        Process files: load and chunk.
+        
+        Args:
+            file_paths: List of file paths
+            chunk_size: Chunk size
+            chunk_overlap: Chunk overlap
+            strategy: Chunking strategy ("Fixed Size" or "Semantic")
+            
+        Returns:
+            List of chunked documents
+        """
+        # 1. Load
+        raw_docs = self.load_documents(file_paths)
+        if not raw_docs:
+            return []
+            
+        # 2. Chunk
+        if strategy == "Semantic":
+            return self.chunk_documents_semantic(raw_docs)
+        else:
+            return self.chunk_documents(raw_docs, chunk_size, chunk_overlap)
+
+    def process_web(self, url: str, depth: int = 1, chunk_size: int = 512, chunk_overlap: int = 50) -> List[Document]:
+        """
+        Process web URL: crawl and chunk.
+        
+        Args:
+            url: URL to crawl
+            depth: Crawl depth
+            chunk_size: Chunk size
+            chunk_overlap: Chunk overlap
+            
+        Returns:
+            List of chunked documents
+        """
+        # 1. Load
+        raw_docs = self.load_web_documents(url, max_depth=depth)
+        if not raw_docs:
+            return []
+            
+        # 2. Chunk
+        return self.chunk_documents(raw_docs, chunk_size, chunk_overlap)

@@ -50,35 +50,31 @@ class DashboardRAG:
             # Clear existing embeddings to avoid duplicates
             self.clear_collection()
             
-            # Prepare documents for embedding
+            # Prepare Document objects for embedding
+            from langchain_core.documents import Document
             documents = []
-            metadatas = []
-            ids = []
             
             for i, card in enumerate(cards):
                 # Combine title and summary for rich semantic content
                 doc_text = f"{card.title}\n{card.summary}"
-                documents.append(doc_text)
                 
-                # Store metadata for retrieval
-                metadatas.append({
-                    "title": card.title,
-                    "summary": card.summary,
-                    "source_type": card.source_type.value,
-                    "source_link": card.source_link,
-                    "urgency_score": card.urgency_score,
-                    "timestamp": card.timestamp.isoformat(),
-                })
-                
-                # Unique ID for each card
-                ids.append(f"card_{i}_{card.timestamp.timestamp()}")
+                # Create Document with metadata
+                doc = Document(
+                    page_content=doc_text,
+                    metadata={
+                        "title": card.title,
+                        "summary": card.summary,
+                        "source_type": card.source_type.value,
+                        "source_link": card.source_link,
+                        "urgency_score": card.urgency_score,
+                        "timestamp": card.timestamp.isoformat(),
+                        "card_id": f"card_{i}_{card.timestamp.timestamp()}"
+                    }
+                )
+                documents.append(doc)
             
-            # Add to vector store
-            self.vector_store.add_documents(
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids
-            )
+            # Add to vector store using the correct method signature
+            self.vector_store.add_documents(documents)
             
             logger.info(f"Successfully embedded {len(cards)} dashboard cards")
             

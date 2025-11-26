@@ -24,7 +24,7 @@ dependencies = [
     "loguru>=0.7.0", # Advanced logging
     "httpx>=0.27.0", # Modern HTTP client
     "tenacity>=8.0.0", # Retry logic
-    "gradio>=5.0.0",
+    "gradio>=5.9.1",  # Latest version with audio recording fixes
     "langchain-ollama>=1.0.0",
     "unstructured>=0.18.20",
     "pdfminer.six>=20221105", # Required for UnstructuredPDFLoader
@@ -54,7 +54,11 @@ dependencies = [
     "youtube-transcript-api>=0.6.0", # Fetch YouTube transcripts
     "yt-dlp>=2024.0.0", # Extract YouTube metadata
     "spacy>=3.8.11",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
     "pyvis>=0.3.2",
+    "multiprocess==0.70.16",
+    "pip>=25.3",
+    "faster-whisper>=1.0.0",  # Voice transcription
 ]
 
 # Optional dependency groups for different AI tools
@@ -85,9 +89,18 @@ vision = [
     "opencv-python>=4.8.0",
 ]
 
+# Audio tools (Speech-to-Text and Text-to-Speech)
+audio = [
+    "faster-whisper>=1.0.0",    # CPU-optimized STT
+    "pyttsx3>=2.90",            # System TTS (primary)
+    "gTTS>=2.4.0",              # Cloud TTS (fallback)
+    "soundfile>=0.12.0",        # Audio I/O
+    "pydub>=0.25.0",            # Audio format conversion
+]
+
 # All AI tools
 all = [
-    "ai-workdesk[llm,embeddings,vision]",
+    "ai-workdesk[llm,embeddings,vision,audio]",
 ]
 
 # Development tools

@@ -53,7 +53,7 @@ class GraphRAG:
             # Add nodes
             for entity, label in entities:
                 if not self.graph.has_node(entity):
-                    self.graph.add_node(entity, label=label, title=f"{entity} ({label})", group=label)
+                    self.graph.add_node(entity, label=entity, title=f"{entity} ({label})", group=label)
                 else:
                     # Increment frequency/weight
                     current_weight = self.graph.nodes[entity].get('value', 1)
