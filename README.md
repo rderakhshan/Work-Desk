@@ -486,10 +486,42 @@ uv run mypy src/
 ### Utility Scripts
 
 Located in `scripts/` directory:
-- `debug_ocr.py` - Test OCR functionality
-- `verify_pdf_fix.py` - Verify PDF loading
-- `check_db.py` - Check vector database status
-- `verify_metadata.py` - Verify metadata store
+
+#### Debugging & Testing
+- **`debug_ocr.py`** - Test OCR functionality with sample images
+- **`debug_graph.html`** - Static HTML output for graph visualization debugging
+- **`debug_graph_html.py`** - Generate debug HTML for knowledge graph testing
+- **`test_graph.html`** - Test HTML file for graph rendering
+- **`reproduce_issue.py`** - Reproduce and debug specific issues
+- **`reproduce_issue_v2.py`** - Enhanced issue reproduction script
+
+#### Data Inspection
+- **`check_db.py`** - Check vector database status and contents
+- **`check_count.py`** - Count documents and chunks in the database
+- **`inspect_data.py`** - Inspect vector store data and metadata
+- **`check_sources.txt`** - Output file with source document information
+- **`check_output.txt`** - General output file for inspection scripts
+- **`inspect_output.txt`** - Detailed inspection results
+- **`output.txt`** - General script output file
+
+#### Verification
+- **`verify_pdf_fix.py`** - Verify PDF loading functionality
+- **`verify_metadata.py`** - Verify metadata store integrity
+
+#### Sample Data
+- **`ingest_sample.py`** - Sample script for document ingestion testing
+
+**Usage Example**:
+```bash
+# Check database status
+uv run python scripts/check_db.py
+
+# Debug OCR
+uv run python scripts/debug_ocr.py
+
+# Verify PDF loading
+uv run python scripts/verify_pdf_fix.py
+```
 
 ## 📦 Installing Optional Dependencies
 
