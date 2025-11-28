@@ -261,37 +261,45 @@ class GraphRAG:
             }},
             physics: {{
                 enabled: true,
-                forceAtlas2Based: {{
-                    gravitationalConstant: -50,
-                    centralGravity: 0.01,
-                    springConstant: 0.08,
-                    springLength: 100,
-                    damping: 0.4,
-                    avoidOverlap: 0.5
+                barnesHut: {{
+                    gravitationalConstant: -8000,
+                    centralGravity: 0.3,
+                    springLength: 200,
+                    springConstant: 0.04,
+                    damping: 0.09,
+                    avoidOverlap: 0.1
                 }},
-                maxVelocity: 50,
-                minVelocity: 0.1,
-                solver: 'forceAtlas2Based',
+                solver: 'barnesHut',
                 stabilization: {{
                     enabled: true,
                     iterations: 1000,
-                    updateInterval: 25
+                    updateInterval: 25,
+                    onlyDynamicEdges: false,
+                    fit: true
                 }}
             }},
             interaction: {{
                 hover: true,
                 tooltipDelay: 200,
-                hideEdgesOnDrag: true
+                hideEdgesOnDrag: true,
+                navigationButtons: false,
+                keyboard: false
+            }},
+            layout: {{
+                randomSeed: 42,
+                improvedLayout: true,
+                clusterThreshold: 150
             }}
         }};
         
         var network = new vis.Network(container, data, options);
         
-        // Fit view after stabilization
+        // Disable physics after stabilization to prevent circular boundary
         network.once('stabilizationIterationsDone', function() {{
+            network.setOptions({{ physics: false }});
             network.fit({{
                 animation: {{
-                    duration: 1000,
+                    duration: 500,
                     easingFunction: 'easeInOutQuad'
                 }}
             }});
