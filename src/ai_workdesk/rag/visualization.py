@@ -60,16 +60,17 @@ class EmbeddingVisualizer:
                 xaxis_title="Dimension 1",
                 yaxis_title="Dimension 2",
                 hovermode='closest',
-                template="plotly_white"
+                template="plotly_white",
+                height=600,
+                width=900
             )
             
-            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False)
             logger.info(f"Projected {len(embeddings)} embeddings to 2D using {method}")
-            return projected, html_plot
+            return projected, fig  # Return figure object, not HTML
             
         except Exception as e:
             logger.error(f"Error projecting embeddings: {e}")
-            return np.array([]), "<p>Error generating visualization</p>"
+            return np.array([]), None  # Return None instead of error HTML
     
     def project_embeddings_3d(
         self, 
@@ -124,16 +125,17 @@ class EmbeddingVisualizer:
                     zaxis_title="Dimension 3"
                 ),
                 hovermode='closest',
-                template="plotly_white"
+                template="plotly_white",
+                height=700,
+                width=900
             )
             
-            html_plot = fig.to_html(include_plotlyjs='cdn', full_html=False)
             logger.info(f"Projected {len(embeddings)} embeddings to 3D using {method}")
-            return projected, html_plot
+            return projected, fig  # Return figure object, not HTML
             
         except Exception as e:
             logger.error(f"Error projecting embeddings to 3D: {e}")
-            return np.array([]), "<p>Error generating 3D visualization</p>"
+            return np.array([]), None  # Return None instead of error HTML
 
 
 def estimate_tokens(text: str, model: str = "gpt-4") -> Tuple[int, float]:

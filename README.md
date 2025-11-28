@@ -10,17 +10,29 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🗄️ **Multi-DB Support**: Integration with ChromaDB, FAISS, PGVector, and more
 - 🌐 **Flexible Providers**: Support for OpenAI, HuggingFace, Ollama, and Google Gemini embeddings
 - 💬 **Context-Aware Chat**: Chat with your dashboard items using selected AI models
+- 🎥 **YouTube Integration**: Ingest video transcripts with timestamp citations
+- 📊 **Knowledge Graph**: Visualize entity relationships in your documents
+- 🔍 **Advanced RAG**: Multiple retrieval strategies (Naive, HyDE, Fusion, Hybrid, Graph+Vector)
 
-## 🆕 Recent Updates (November 23, 2025)
+## 🆕 Recent Updates (November 24, 2024)
 
-### 🧬 Embedding LAB - Phase 1 Enhancements ✅
+### 🐛 Bug Fixes & Improvements ✅
+- ✅ **Fixed Embedding Errors**: Resolved `add_documents()` TypeError in vector store and Smart Dashboard
+- ✅ **Improved Web Crawling**: Better timeout handling (120s), max pages limit (100), and error messages
+- ✅ **YouTube UI Enhancement**: Added scrolling capability to status textbox for long summaries
+- ✅ **Similarity Threshold**: Updated default from 0.7 to 0.1 for better retrieval recall
+- ✅ **Project Cleanup**: Moved debug/test scripts to appropriate directories (`scripts/`, `tests/`)
+- ✅ **Copy Buttons**: Added copy functionality to all status textboxes in Embedding LAB
+
+### 🧬 Embedding LAB Enhancements
 - ✅ **Dynamic Model Selection**: Choose embedding models before ingestion (HuggingFace, Ollama, OpenAI)
 - ✅ **Web Crawling**: Ingest content directly from URLs with configurable depth (0-5 levels)
-- ✅ **Enhanced Ingestion UI**: Dual-tab interface (Files + Web) with model dropdowns
-- 📦 **Backup Available**: `git checkout embedding-lab-phase1-backup` to restore this working state
-- 📋 **Future Phases**: See [`implementation_plan.md`](./implementation_plan.md) for Phases 2-5 roadmap
+- ✅ **YouTube Ingestion**: Process video transcripts with auto-summary generation and playlist support
+- ✅ **Enhanced Status Display**: Scrollable status boxes with copy buttons for long outputs
+- ✅ **PDF Support**: Dual-strategy PDF loading (PyPDFLoader + UnstructuredPDFLoader with OCR)
+- ✅ **Image OCR**: Support for image formats (PNG, JPG, TIFF, BMP, GIF) with OCR capabilities
 
-### 🏠 Smart Homepage ("Project Ambitions")
+### 🏠 Smart Homepage
 - ✅ **Full-Width Glassmorphism UI**: Modern, asymmetrical 65/35 split layout
 - ✅ **Time & Weather Widget**: Live clock and weather display at top right
 - ✅ **Smart Feed**: Timeline-style feed combining emails, news, videos, and trends
@@ -28,17 +40,13 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - ✅ **Context-Aware AI Chat**: Chat with dashboard items using Ollama or OpenAI
 - ✅ **File Attachments**: Upload text files (.txt, .md, .py, etc.) for AI analysis
 - ✅ **Inline Citations**: AI answers include "Sources Used" with links and urgency scores
-- ✅ **Enhanced Progress**: Visible "AI is thinking..." indicator during processing
-- ✅ **Default Models**: DeepSeek-R1:7b (Ollama) and GPT-4o-mini (OpenAI)
-- ✅ **Floating Stats**: Real-time urgency scores and item counts
-- ✅ **Quick Actions**: One-click access to common tasks
 
-### RAG Enhancements
-- ✅ **True Vector Search**: Semantic retrieval using `langchain-chroma` and `langchain-huggingface`
-- ✅ **Contextual Retrieval**: Top-5 relevant dashboard items injected into chat context
-- ✅ **Collection Stats**: Real-time document count logging
-- ✅ **Better Error Messages**: Shows actual distances when retrieval fails
-- ✅ **Threshold Guidance**: Recommends optimal similarity threshold values (0.3-0.4 for ChromaDB)
+### 📊 Advanced Features
+- ✅ **Knowledge Graph**: Entity extraction and relationship visualization
+- ✅ **Embedding Projector**: UMAP/t-SNE visualization in 2D/3D
+- ✅ **Metadata Tracking**: SQLite-based document metadata with pagination
+- ✅ **Collection Management**: Create, switch, and delete vector store collections
+- ✅ **RAG Evaluation**: Quality metrics and performance tracking
 
 ## 📁 Project Structure
 
@@ -53,11 +61,15 @@ ai-workdesk/
 │       ├── rag/              # RAG pipeline
 │       │   ├── ingestion.py  # Document processing & chunking
 │       │   ├── vector_store.py # Vector database management
-│       │   └── metadata_store.py # Document metadata tracking
+│       │   ├── metadata_store.py # Document metadata tracking
+│       │   ├── graph_rag.py  # Knowledge graph RAG
+│       │   ├── youtube_loader.py # YouTube transcript loader
+│       │   └── advanced_features.py # OCR, evaluation, multimodal
 │       ├── smart_dashboard/  # Smart Homepage
 │       │   ├── ui.py         # Dashboard UI components
 │       │   ├── data_engine.py # Data aggregation
 │       │   ├── ai_processor.py # AI chat integration
+│       │   ├── rag_engine.py # Dashboard RAG engine
 │       │   ├── models.py     # Data models
 │       │   └── fetchers/     # Data source fetchers
 │       │       ├── email_fetcher.py
@@ -74,8 +86,14 @@ ai-workdesk/
 │       │   ├── retrieval/   # RAG tools
 │       │   └── vision/      # Vision tools
 │       └── utils/           # Shared utilities
-├── docs/                    # Documentation
+├── scripts/                 # Utility scripts
+│   ├── debug_ocr.py        # OCR debugging
+│   ├── verify_pdf_fix.py   # PDF verification
+│   └── ...                 # Other utility scripts
 ├── tests/                   # Test suite
+│   ├── test_rag_chat.py    # RAG chat tests
+│   └── ...                 # Other tests
+├── docs/                    # Documentation
 ├── data/                    # Data directory
 │   └── chroma_db/          # ChromaDB persistent storage
 └── config/                  # Configuration files
@@ -88,6 +106,7 @@ ai-workdesk/
 - Python 3.12+
 - `uv` installed ([Install Guide](https://docs.astral.sh/uv/getting-started/installation/))
 - **Recommended**: [Ollama](https://ollama.ai/) for local model support (privacy and offline use)
+- **Optional**: Tesseract OCR for scanned PDF/image processing
 
 ### Installation
 
@@ -123,8 +142,15 @@ uv run ai-workdesk-ui
 # Download and install Ollama from https://ollama.ai/
 
 # Pull recommended models
-ollama pull deepseek-r1:7b      # Chat model (reasoning) - Default for Smart Homepage
+ollama pull deepseek-r1:7b      # Chat model (reasoning) - Default
 ollama pull nomic-embed-text    # Embedding model
+```
+
+6. **Optional: Install Tesseract OCR (for scanned PDFs/images):**
+```bash
+# Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
+# macOS: brew install tesseract
+# Linux: sudo apt-get install tesseract-ocr
 ```
 
 ## 🏠 Smart Homepage
@@ -152,31 +178,143 @@ The Smart Homepage is your AI-powered command center, providing an intelligent o
   - 📺 YouTube videos
   - 📈 Trending topics
 - All items are **clickable** and link to their original sources
-- Sorted by timestamp for latest updates first
+- Sorted by urgency score and timestamp
 
 **💬 Context-Aware AI Chat**
 - Chat bar positioned at the top for easy access
 - **Default Model**: DeepSeek-R1:7b (Ollama)
 - **Provider Selection**: Switch between Ollama and OpenAI
 - **Full Context**: AI receives complete details of all dashboard items
-  - Titles, summaries, links, urgency scores, timestamps
 - Ask questions like:
   - "Summarize the urgent items"
   - "What are the trending topics today?"
   - "Show me YouTube videos about AI"
 
-**📈 Floating Stats**
-- Total items count
-- Critical actions (urgency > 60)
-- Real-time updates
+## 📄 Document Ingestion & RAG Pipeline
 
-**⚡ Quick Actions**
-- One-click buttons for common tasks
-- "Clear Inbox" and "Start Focus" modes
+The AI Workdesk includes a complete RAG (Retrieval-Augmented Generation) pipeline with document ingestion and vector storage capabilities.
 
-### Customization
+### 🧬 Embedding LAB (Document Ingestion)
 
-The Smart Homepage can be extended with additional data sources by creating new fetchers in `src/ai_workdesk/smart_dashboard/fetchers/`.
+Upload and process documents to build your knowledge base:
+
+#### Ingestion Methods
+
+**📄 Files Tab**
+1. Select embedding provider (HuggingFace, Ollama, OpenAI)
+2. Choose embedding model
+3. Upload files (see supported formats below)
+4. Configure chunking settings
+5. Click "🚀 Ingest Documents"
+
+**🌐 Web Tab**
+1. Enter target URL
+2. Set crawl depth:
+   - **0**: Single page only
+   - **1**: Page + direct links
+   - **2+**: Deeper crawling (use with caution)
+3. Configure timeout (default: 120s) and max pages (default: 100)
+4. Click "🚀 Crawl & Ingest"
+
+**🎥 YouTube Tab**
+1. Enter YouTube URL(s) (one per line for batch processing)
+2. Enable/disable auto-summary generation
+3. Enable/disable playlist support
+4. Configure chunking settings
+5. Click "🚀 Process Videos"
+
+**Features:**
+- ✅ Scrollable status output for long summaries
+- ✅ Copy button to save status/summaries
+- ✅ Timestamp preservation for video citations
+- ✅ Automatic metadata tracking
+
+### 💬 Chat LAB (RAG-Enhanced Chat)
+
+Interact with your documents using advanced RAG techniques:
+
+**RAG Techniques:**
+- **Naive RAG**: Direct similarity search (fastest)
+- **HyDE**: Hypothetical Document Embeddings for better semantic matching
+- **RAG Fusion**: Multiple query variations with merged results
+- **Hybrid Search**: Combines semantic and keyword search
+- **Graph+Vector**: Entity-aware retrieval using knowledge graph
+- **None**: Chat without document retrieval
+
+**Advanced Settings:**
+- **Top-K Retrieval**: 1-20 chunks (default: 5)
+- **Similarity Threshold**: 0.0-1.0 (default: 0.1)
+  - Lower values = more permissive retrieval
+  - Recommended: 0.1-0.3 for ChromaDB
+- **Chunk Size**: 256, 512, 1024, 2048 tokens
+- **Chunk Overlap**: 0-200 tokens
+- **Reranker**: Enable/disable result reranking
+- **System Prompt**: Custom AI instructions
+
+**Chat Features:**
+- ✅ Source citations with document references
+- ✅ Export chat as Markdown
+- ✅ Temperature control (0.0-2.0)
+- ✅ Max tokens up to 8192
+- ✅ Provider switching (OpenAI/Ollama)
+
+### 📊 Visualization & Analysis
+
+**Embedding Projector**
+- Visualize document embeddings in 2D/3D
+- Methods: UMAP, t-SNE
+- Quality metrics: silhouette score, Davies-Bouldin index
+
+**Knowledge Graph**
+- Entity extraction (People, Organizations, Locations, Products, Events)
+- Interactive network visualization with vis.js
+- **Dynamic Filtering**: Adjust max nodes and connection strength in real-time
+- **Premium Aesthetics**: Bright, vibrant node colors with subtle edge rendering
+- **Optimized Performance**: Reduced logging (every 100 documents) for faster processing
+- Graph statistics and metrics
+
+**Metadata Management**
+- View all ingested documents
+- Pagination support
+- Document summaries
+- Delete individual entries
+
+### Supported File Formats
+
+**Documents:**
+- Text Files (`.txt`)
+- PDF Files (`.pdf`) - with OCR support for scanned documents
+- Markdown (`.md`)
+- Word Documents (`.docx`)
+- PowerPoint (`.pptx`)
+- Excel Files (`.xlsx`, `.xls`)
+
+**Data:**
+- CSV Files (`.csv`)
+- JSON Files (`.json`)
+
+**Web:**
+- HTML Files (`.html`, `.htm`)
+
+**Images (with OCR):**
+- PNG (`.png`)
+- JPEG (`.jpg`, `.jpeg`)
+- TIFF (`.tiff`, `.tif`)
+- BMP (`.bmp`)
+- GIF (`.gif`)
+
+**Media:**
+- YouTube Videos (via URL)
+
+### Vector Store
+
+- **Default**: ChromaDB (persistent storage)
+- **Location**: `./data/chroma_db/` directory
+- **Embedding Models**: 
+  - **Ollama**: `nomic-embed-text` (default, local)
+  - **HuggingFace**: `sentence-transformers/all-MiniLM-L6-v2`
+  - **OpenAI**: `text-embedding-3-small`
+- **Features**: Automatic persistence, metadata support, similarity search, hybrid search
 
 ## 🔐 Authentication Setup
 
@@ -218,97 +356,6 @@ For complete privacy and offline usage, use Ollama without any API keys:
 
 The system will automatically use Ollama models when configured, with no cloud API keys required.
 
-### Check Authentication Status
-
-```bash
-uv run python -c "from ai_workdesk import get_auth_manager; get_auth_manager().display_authentication_status()"
-```
-
-## 📄 Document Ingestion & RAG Pipeline
-
-The AI Workdesk includes a complete RAG (Retrieval-Augmented Generation) pipeline with document ingestion and vector storage capabilities.
-
-### 🧬 Embedding LAB (Document Ingestion)
-
-Upload and process documents to build your knowledge base:
-
-1. **Navigate to Work Desk → Embedding LAB → Ingestion**
-2. **Select Embedding Model**:
-   - **Provider**: HuggingFace, Ollama, or OpenAI
-   - **Model**: Choose from presets or enter custom model name
-     - HuggingFace: `all-MiniLM-L6-v2`, `bge-m3`, `nomic-embed-text`
-     - Ollama: Any locally available embedding model
-     - OpenAI: `text-embedding-3-small`, `text-embedding-3-large`
-3. **Choose Ingestion Method**:
-   - **📄 Files Tab**: Upload local documents (see supported formats below)
-   - **🌐 Web Tab**: Crawl and ingest from URLs
-     - Enter target URL
-     - Set crawl depth (0 = single page, 1-5 = follow links)
-4. **Configure Chunking Settings**:
-   - **Chunk Size**: 256, 512, or 1024 tokens
-   - **Chunk Overlap**: 0-200 tokens (recommended: 50)
-5. **Click "🚀 Ingest Files" or "🕷️ Crawl & Ingest"**
-
-The system will:
-- Load and parse your documents or crawl the specified URL
-- Split content into optimized chunks
-- Generate embeddings using the selected model
-- Store vectors in ChromaDB for fast retrieval
-
-### 💬 Chat LAB (RAG-Enhanced Chat)
-
-Interact with your documents using advanced RAG techniques:
-
-**Provider-Based Model Selection:**
-- **Provider Dropdown**: Choose between OpenAI or Ollama
-- **Dynamic Model Filtering**: Model list updates based on selected provider
-  - **OpenAI**: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-4, gpt-3.5-turbo
-  - **Ollama**: deepseek-r1:7b, gemma3:4b, llama3, mistral, phi3
-
-**RAG Techniques** (Choose your retrieval strategy):
-- **Naive RAG**: Direct similarity search (fastest, good for most cases)
-- **HyDE (Hypothetical Document Embeddings)**: Generates hypothesis first for better semantic matching
-- **RAG Fusion**: Uses multiple query variations and merges results for comprehensive retrieval
-- **None**: Chat without document retrieval
-
-**Chat Features:**
-- **Source Citations**: Automatically shows which documents were used in the response
-- **Export Chat**: Download conversation history as Markdown with browser "Save As" dialog
-- **Temperature**: 0.0 (focused) to 2.0 (creative)
-- **Max Tokens**: Up to 8192 tokens
-
-**Advanced RAG Settings:**
-- **Top-K Retrieval**: Number of chunks to retrieve (1-20)
-- **Similarity Threshold**: Minimum similarity score (0.0-1.0)
-  - **Recommended**: 0.3-0.4 for ChromaDB (uses distance metric)
-  - Lower values = more permissive retrieval
-- **Chunk Size**: Token size for document chunks
-- **Chunk Overlap**: Overlap between consecutive chunks
-- **Reranker**: Enable/disable result reranking
-- **System Prompt**: Custom instructions for the AI
-
-### Supported File Formats
-
-- **Text Files** (`.txt`): Plain text documents
-- **PDF Files** (`.pdf`): Portable Document Format
-- **Markdown** (`.md`): Markdown formatted documents
-- **Word Documents** (`.docx`): Microsoft Word files
-- **CSV Files** (`.csv`): Comma-separated values
-- **JSON Files** (`.json`): JSON data files
-- **HTML Files** (`.html`, `.htm`): Web pages
-- **PowerPoint** (`.pptx`): Microsoft PowerPoint presentations
-- **Excel Files** (`.xlsx`, `.xls`): Microsoft Excel spreadsheets
-
-### Vector Store
-
-- **Default**: ChromaDB (persistent storage)
-- **Location**: `./data/chroma_db/` directory
-- **Embedding Models**: 
-  - **Ollama**: `nomic-embed-text` (default, local)
-  - **HuggingFace**: `sentence-transformers/all-MiniLM-L6-v2`
-  - **OpenAI**: `text-embedding-3-small`
-- **Features**: Automatic persistence, metadata support, similarity search
-
 ## 📚 Usage Examples
 
 ### Using the Smart Homepage Chat
@@ -345,20 +392,25 @@ models = client.list_models()
 print(f"Available models: {models}")
 ```
 
-### Using OpenAI (Cloud)
+### Using the RAG Pipeline
 
 ```python
-from ai_workdesk.core import get_settings
-from openai import OpenAI
+from ai_workdesk.rag.ingestion import DocumentProcessor
+from ai_workdesk.rag.vector_store import VectorStoreManager
 
-settings = get_settings()
-client = OpenAI(api_key=settings.openai_api_key)
+# Initialize components
+doc_processor = DocumentProcessor()
+vector_store = VectorStoreManager()
 
-response = client.chat.completions.create(
-    model=settings.default_llm_model,
-    messages=[{"role": "user", "content": "Hello!"}]
-)
-print(response.choices[0].message.content)
+# Load and process documents
+documents = doc_processor.load_documents(["path/to/file.pdf"])
+chunks = doc_processor.chunk_documents(documents, chunk_size=512, chunk_overlap=50)
+
+# Add to vector store
+vector_store.add_documents(chunks)
+
+# Search
+results = vector_store.similarity_search("your query", k=5, score_threshold=0.1)
 ```
 
 ## 🔧 Configuration
@@ -370,22 +422,74 @@ All configuration is managed through environment variables and `pyproject.toml`:
 See `.env.example` for all available options:
 
 **LLM & Model Settings:**
-- **Cloud API Keys**: OpenAI, Anthropic, Google, Cohere (optional)
-- **Ollama Settings**: Base URL, chat model, embedding model
-- **Model Defaults**: Default models, temperature, max tokens
-
-**Ollama Configuration (Local Models):**
-```bash
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_CHAT_MODEL=deepseek-r1:7b
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-```
+- Cloud API Keys: OpenAI, Anthropic, Google, Cohere (optional)
+- Ollama Settings: Base URL, chat model, embedding model
+- Model Defaults: Default models, temperature, max tokens
 
 **Application Settings:**
 - Environment, log level, paths
 - Vector Store: ChromaDB configuration
 - Security: Rate limiting, timeouts, retries
 - Advanced RAG: Top-K retrieval, chunk size/overlap, reranking
+
+## 🐛 Troubleshooting
+
+### Web Crawling Timeouts
+
+If you encounter `TimeoutError` when crawling websites:
+1. **Reduce crawl depth** to 0 or 1
+2. **Increase timeout** in the code (default: 120s)
+3. **Use max_pages limit** to prevent overwhelming sites
+4. **Try single pages** instead of deep crawling
+
+### PDF Loading Errors
+
+If PDFs fail to load:
+1. **Install Tesseract OCR** for scanned documents
+2. **Check PDF format** - some encrypted PDFs may not work
+3. **Try PyPDFLoader fallback** - automatically attempted
+
+### Embedding Errors
+
+If you see `add_documents()` errors:
+- ✅ **Fixed in latest version** - update your code
+- Ensure you're passing Document objects, not raw text
+
+## 💻 Development
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=ai_workdesk --cov-report=html
+
+# Run specific test file
+uv run pytest tests/test_rag_chat.py
+```
+
+### Code Quality
+
+```bash
+# Format code with ruff
+uv run ruff format .
+
+# Lint code
+uv run ruff check .
+
+# Type checking with mypy
+uv run mypy src/
+```
+
+### Utility Scripts
+
+Located in `scripts/` directory:
+- `debug_ocr.py` - Test OCR functionality
+- `verify_pdf_fix.py` - Verify PDF loading
+- `check_db.py` - Check vector database status
+- `verify_metadata.py` - Verify metadata store
 
 ## 📦 Installing Optional Dependencies
 
@@ -406,34 +510,6 @@ uv sync --extra all
 
 # Install dev dependencies (already installed by default)
 uv sync --extra dev
-```
-
-## 💻 Development
-
-### Running Tests
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=ai_workdesk --cov-report=html
-
-# Run specific test file
-uv run pytest tests/unit/test_config.py
-```
-
-### Code Quality
-
-```bash
-# Format code with ruff
-uv run ruff format .
-
-# Lint code
-uv run ruff check .
-
-# Type checking with mypy
-uv run mypy src/
 ```
 
 ## 📖 Available Dependency Groups
@@ -463,10 +539,13 @@ This project is licensed under the MIT License.
 - Built with [uv](https://github.com/astral-sh/uv) - An extremely fast Python package installer
 - Local model support powered by [Ollama](https://ollama.ai/) - Run LLMs locally
 - RAG pipeline built with [LangChain](https://www.langchain.com/) - Framework for LLM applications
+- Vector store powered by [ChromaDB](https://www.trychroma.com/) - AI-native open-source embedding database
 - Uses [Pydantic](https://docs.pydantic.dev/) for settings management
 - Logging powered by [Loguru](https://github.com/Delgan/loguru)
 - Beautiful terminal output with [Rich](https://github.com/Textualize/rich)
 - Web UI built with [Gradio](https://www.gradio.app/) - Fast web interfaces for ML
+- Knowledge graphs with [NetworkX](https://networkx.org/) and [PyVis](https://pyvis.readthedocs.io/)
+- OCR powered by [Tesseract](https://github.com/tesseract-ocr/tesseract) and [Unstructured](https://unstructured.io/)
 
 ---
 

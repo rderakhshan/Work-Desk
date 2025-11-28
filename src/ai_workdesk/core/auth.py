@@ -23,6 +23,23 @@ class AuthenticationManager:
         """Initialize the authentication manager."""
         self.settings = get_settings()
 
+    def authenticate(self, username, password):
+        """
+        Authenticate user against default credentials.
+        
+        Args:
+            username: Username
+            password: Password
+            
+        Returns:
+            True if authenticated, False otherwise
+        """
+        credentials = {
+            "admin": "admin123",
+            "demo": "demo123"
+        }
+        return credentials.get(username) == password
+
     def get_openai_api_key(self) -> str | None:
         """
         Get OpenAI API key from settings or environment.
