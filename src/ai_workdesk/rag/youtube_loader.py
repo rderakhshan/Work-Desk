@@ -229,7 +229,7 @@ class YouTubeTranscriptLoader:
                     'source': info.get('title', 'Unknown Title'),
                     'channel': info.get('uploader', 'Unknown Channel'),
                     'duration': info.get('duration', 0),  # In seconds
-                    'upload_date': info.get('upload_date', ''),
+                    'upload_ts': info.get('upload_date', ''),
                     'description': info.get('description', '')[:500],  # First 500 chars
                     'view_count': info.get('view_count', 0),
                     'thumbnail': info.get('thumbnail', ''),

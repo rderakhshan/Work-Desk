@@ -54,6 +54,7 @@ def create_metadata_tab(ui):
             col_list = gr.Dropdown(label="Select Collection", choices=["default"], value="default")
             switch_col_btn = gr.Button("📂 Switch", variant="secondary")
             delete_col_btn = gr.Button("🗑️ Delete", variant="stop")
+            clear_vs_btn = gr.Button("🗑️ Clear Vector Store", variant="stop") # New button
         
         col_status = gr.Textbox(label="Status", interactive=False)
         
@@ -74,4 +75,10 @@ def create_metadata_tab(ui):
             ui.delete_collection,
             inputs=[col_list],
             outputs=[col_status, col_list]
+        )
+
+        clear_vs_btn.click( # New event listener
+            ui.clear_vector_store,
+            inputs=[],
+            outputs=[col_status]
         )

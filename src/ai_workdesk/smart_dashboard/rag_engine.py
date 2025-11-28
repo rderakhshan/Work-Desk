@@ -17,11 +17,8 @@ class DashboardRAG:
         """Initialize the RAG engine with a dedicated ChromaDB collection."""
         self.collection_name = collection_name
         
-        # Initialize VectorStoreManager with default settings
-        self.vector_store = VectorStoreManager(
-            persist_directory="data/chroma_db",
-            embedding_provider="huggingface"
-        )
+        # Initialize VectorStoreManager, which will use settings from config
+        self.vector_store = VectorStoreManager()
         
         # Override collection name for dashboard items
         self.vector_store.collection_name = collection_name

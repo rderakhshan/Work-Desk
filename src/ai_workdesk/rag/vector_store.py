@@ -9,30 +9,37 @@ from langchain_chroma import Chroma
 class VectorStoreManager:
     """Manages interactions with the Vector Database (ChromaDB) and supports multiple embedding providers."""
 
-    def __init__(self, persist_directory: str = "./chroma_db", embedding_provider: str = "huggingface", embedding_model: Optional[str] = None):
+    def __init__(self, persist_directory: Optional[str] = None, embedding_provider: Optional[str] = None, embedding_model: Optional[str] = None):
         """Initialize VectorStoreManager with configurable embedding provider.
 
         Args:
-            persist_directory: Directory for ChromaDB persistence.
-            embedding_provider: One of "huggingface", "ollama", "openai".
+            persist_directory: Directory for ChromaDB persistence. If None, uses path from settings.
+            embedding_provider: One of "huggingface", "ollama", "openai". If None, uses provider from settings.
             embedding_model: Specific model name; if None, defaults from Settings are used.
         """
         from ai_workdesk.core.config import get_settings
         settings = get_settings()
 
-        self.persist_directory = persist_directory
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        self.collection_name = "ai_workdesk_collection"
+        self.persist_directory = persist_directory or str(settings.chroma_persist_directory)
+        self.client = chromadb.PersistentClient(path=self.persist_directory)
+        self.collection_name = settings.chroma_collection_name
 
         # Determine embedding function based on provider
-        if embedding_provider == "ollama":
+        provider = embedding_provider or settings.default_embedding_provider
+        logger.debug(f"Resolved embedding provider: {provider}")
+        if provider == "ollama":
             from langchain_ollama import OllamaEmbeddings
             model_name = embedding_model or settings.ollama_embedding_model
             self.embedding_function = OllamaEmbeddings(model=model_name, base_url=settings.ollama_base_url)
-        elif embedding_provider == "openai":
+        elif provider == "openai":
             from langchain_openai import OpenAIEmbeddings
             model_name = embedding_model or settings.default_embedding_model
-            self.embedding_function = OpenAIEmbeddings(model=model_name)
+            if not settings.openai_api_key:
+                raise ValueError("OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable or configure it in your settings.")
+            self.embedding_function = OpenAIEmbeddings(
+                model=model_name,
+                api_key=settings.openai_api_key
+            )
         else:  # default to huggingface
             from langchain_huggingface import HuggingFaceEmbeddings
             model_name = embedding_model or "all-MiniLM-L6-v2"
@@ -44,7 +51,7 @@ class VectorStoreManager:
             collection_name=self.collection_name,
             embedding_function=self.embedding_function,
         )
-        logger.info(f"VectorStoreManager initialized at {persist_directory} with provider {embedding_provider}")
+        logger.info(f"VectorStoreManager initialized at {persist_directory} with provider {provider}")
 
     def add_documents(self, chunks: List[Document]) -> bool:
         """Add document chunks to the vector store.
@@ -207,6 +214,21 @@ class VectorStoreManager:
             logger.error(f"Error listing collections: {e}")
             return []
 
+    def get_all_embeddings(self) -> dict:
+        """Get all embeddings and documents from the collection for visualization.
+        
+        Returns:
+            Dict containing 'embeddings', 'documents', 'metadatas', 'ids'.
+        """
+        try:
+            collection = self.client.get_collection(self.collection_name)
+            # Get everything: embeddings, documents, metadatas
+            results = collection.get(include=['embeddings', 'documents', 'metadatas'])
+            return results
+        except Exception as e:
+            logger.error(f"Error getting all embeddings: {e}")
+            return {}
+
     def create_collection(self, collection_name: str) -> bool:
         """Create a new collection."""
         try:
@@ -258,3 +280,27 @@ class VectorStoreManager:
         except Exception as e:
             logger.error(f"Error retrieving embeddings: {e}")
             return {}
+
+    def get_all_documents(self) -> List[Document]:
+        """Retrieve all documents from the current collection."""
+        try:
+            collection = self.client.get_collection(self.collection_name)
+            total_docs = collection.count()
+
+            if total_docs == 0:
+                logger.warning("Collection is EMPTY! No documents to retrieve.")
+                return []
+
+            all_results = collection.get(include=["documents", "metadatas"])
+            
+            documents = []
+            for i, text in enumerate(all_results["documents"]):
+                metadata = all_results["metadatas"][i] if all_results["metadatas"] and i < len(all_results["metadatas"]) else {}
+                documents.append(Document(page_content=text, metadata=metadata))
+
+            logger.info(f"Retrieved {len(documents)} documents from collection '{self.collection_name}'.")
+            return documents
+
+        except Exception as e:
+            logger.error(f"Error retrieving all documents: {e}")
+            return []

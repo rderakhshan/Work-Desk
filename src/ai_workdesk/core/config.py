@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # MODEL CONFIGURATION
     # =============================================================================
     default_llm_model: str = Field("gpt-4o-mini", description="Default LLM model")
+    default_embedding_provider: str = Field(
+        "huggingface", description="Default embedding provider (e.g., 'openai', 'huggingface', 'ollama')"
+    )
     default_embedding_model: str = Field(
         "text-embedding-3-small", description="Default embedding model"
     )

@@ -2,6 +2,7 @@ import os
 import sqlite3
 from datetime import datetime
 from typing import List, Dict, Any
+from loguru import logger
 
 
 class MetadataStore:
@@ -13,6 +14,7 @@ class MetadataStore:
 
     def __init__(self, db_path: str = "data/metadata.db"):
         self.db_path = db_path
+        logger.info(f"Initializing MetadataStore with database at: {os.path.abspath(self.db_path)}")
         self._ensure_db()
 
     def _ensure_db(self) -> None:

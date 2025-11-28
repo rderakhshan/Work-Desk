@@ -1,3 +1,4 @@
+print("!!!!!!!! GRADIO APP MODULE IS BEING RELOADED !!!!!!!!")
 """
 AI Workdesk - Main Gradio Application
 """
@@ -74,7 +75,11 @@ class AIWorkdeskUI:
     def vector_store(self):
         """Lazy load vector store."""
         if self._vector_store is None:
-            self._vector_store = VectorStoreManager()
+            # Explicitly initialize with the configured default provider
+            logger.info(f"Initializing VectorStoreManager with default provider: {self.settings.default_embedding_provider}")
+            self._vector_store = VectorStoreManager(
+                embedding_provider=self.settings.default_embedding_provider
+            )
         return self._vector_store
 
     def authenticate(self, username, password):
@@ -98,7 +103,7 @@ class AIWorkdeskUI:
                     entry['filename'],
                     entry['doc_type'],
                     f"{entry['size']/1024:.1f} KB",
-                    entry['upload_date'],
+                    entry['upload_ts'],
                     0 # Chunk count placeholder
                 ])
             return data, f"Page {page}"
@@ -195,6 +200,7 @@ class AIWorkdeskUI:
             # Add to vector store
             self.vector_store.add_documents(documents)
             
+            
             # Save metadata
             for f in files:
                 try:
@@ -217,6 +223,7 @@ class AIWorkdeskUI:
             return "⚠️ Please enter a URL."
         
         try:
+            # Process web content
             documents = self.doc_processor.process_web(
                 url,
                 depth=int(depth),
@@ -228,6 +235,17 @@ class AIWorkdeskUI:
                 return "❌ No content could be extracted."
             
             self.vector_store.add_documents(documents)
+            
+            # Save metadata
+            try:
+                total_size = sum(len(doc.page_content) for doc in documents)
+                self.metadata_store.add_entry(
+                    filename=url,
+                    size=total_size,
+                    doc_type="web"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to save metadata for {url}: {e}")
             
             return f"✅ Successfully crawled {url} ({len(documents)} chunks)."
         except Exception as e:
@@ -253,6 +271,23 @@ class AIWorkdeskUI:
             
             self.vector_store.add_documents(documents)
             
+            # Save metadata for each URL
+            try:
+                for url in url_list:
+                    # Find the documents that came from this URL
+                    url_docs = [d for d in documents if d.metadata.get('url') == url]
+                    if url_docs:
+                        total_size = sum(len(doc.page_content) for doc in url_docs)
+                        # Use the title from the first document's metadata as the filename
+                        filename = url_docs[0].metadata.get('source', url)
+                        self.metadata_store.add_entry(
+                            filename=filename,
+                            size=total_size,
+                            doc_type="youtube"
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to save metadata for YouTube URLs: {e}")
+
             return f"✅ Successfully processed {len(url_list)} videos ({len(documents)} chunks)."
         except Exception as e:
             logger.error(f"YouTube ingestion error: {e}")
@@ -311,16 +346,122 @@ class AIWorkdeskUI:
         return None
 
     def handle_visualization(self, method, dimension):
-        """Handle visualization."""
-        return "✅ Visualization generated (Placeholder)", "<div>Plot Placeholder</div>", "Metrics Placeholder"
+        """Handle visualization.
+
+        Generates an embedding visualization using the selected reduction method and dimension.
+        Returns a Plotly Figure (compatible with gr.Plot).
+        """
+        try:
+            # Lazy import to avoid heavy dependencies at module load
+            import numpy as np
+            import plotly.graph_objects as go
+
+            # Fetch real embeddings from vector store
+            data = self.vector_store.get_all_embeddings()
+            embeddings = data.get("embeddings")
+            metadatas = data.get("metadatas")
+            
+            if embeddings is None or len(embeddings) == 0:
+                 # Fallback to dummy if empty
+                 logger.warning("No embeddings found, using dummy data")
+                 embeddings = np.random.rand(100, 768)
+                 labels = [f"Doc {i}" for i in range(100)]
+            else:
+                 embeddings = np.array(embeddings)
+                 # Create labels from metadata (e.g., source filename)
+                 labels = []
+                 if metadatas:
+                     for i, m in enumerate(metadatas):
+                         source = m.get("source", "")
+                         if source:
+                             # Use basename of source
+                             import os
+                             label = os.path.basename(source)
+                         else:
+                             label = f"Doc {i}"
+                         labels.append(label)
+                 else:
+                     labels = [f"Doc {i}" for i in range(len(embeddings))]
+
+            # Use the fetched/dummy embeddings
+            dummy_embeddings = embeddings
+            dummy_labels = labels
+
+            # Choose projection based on dimension
+            if dimension == "2D":
+                projected, fig = self.visualizer.project_embeddings_2d(
+                    dummy_embeddings, labels=dummy_labels, method=method.lower()
+                )
+            else:  # 3D
+                projected, fig = self.visualizer.project_embeddings_3d(
+                    dummy_embeddings, labels=dummy_labels, method=method.lower()
+                )
+
+            # Ensure we have a Plotly Figure
+            if isinstance(fig, tuple):
+                # If visualizer returns (projected, fig), extract fig
+                if len(fig) >= 2:
+                    fig = fig[1]
+                else:
+                    # Fallback if tuple structure is unexpected
+                    import plotly.graph_objects as go
+                    fig = go.Figure()
+                    fig.update_layout(title="Visualization Error: Unexpected return format")
+
+            if not isinstance(fig, go.Figure):
+                import plotly.graph_objects as go
+                fig = go.Figure()
+                fig.update_layout(title="Visualization Failed: Invalid return type")
+
+            return fig
+        except Exception as e:
+            logger.error(f"Visualization error: {e}")
+            import plotly.graph_objects as go
+            empty_fig = go.Figure()
+            empty_fig.update_layout(title=f"Error: {str(e)}")
+            return empty_fig
 
     def handle_token_estimation(self, files):
         """Handle token estimation."""
         return "💰 Cost estimation (Placeholder)"
 
-    def handle_graph_generation(self):
+    def handle_graph_generation(self, max_nodes=100, min_weight=1, viz_mode="2D"):
         """Handle graph generation."""
-        return "✅ Graph generated (Placeholder)", "<div>Graph Placeholder</div>", "Stats Placeholder"
+        try:
+            # Fetch all documents from the vector store
+            all_docs = self.vector_store.get_all_documents()
+
+            if not all_docs:
+                return "<div><p style='text-align:center; padding:20px;'>No documents in the vector store. Please ingest some documents first.</p></div>"
+
+            # Build graph from all documents
+            self.graph_rag.build_graph([doc.page_content for doc in all_docs], clear=True)
+            
+            # Check graph stats first
+            stats = self.graph_rag.get_graph_stats()
+            if stats["nodes"] < 2:
+                return f"<div style='text-align:center; padding:20px;'><p>Graph is too small to display. It requires at least 2 entities to form a connection.</p><p><b>Current Nodes: {stats['nodes']}</b></p><p>Please try ingesting more documents with diverse entities.</p></div>"
+
+            # Generate graph HTML with filters and mode
+            html_path = self.graph_rag.visualize_graph(max_nodes=int(max_nodes), min_edge_weight=int(min_weight), mode=viz_mode)
+            
+            if not html_path or not os.path.exists(html_path):
+                return "<div><p style='text-align:center; padding:20px;'>No graph data available. Please ingest some documents first.</p></div>"
+            
+            # Read HTML content
+            with open(html_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            # Wrap in iframe for isolation to ensure scripts run correctly
+            import html
+            escaped_html = html.escape(html_content)
+            # Increased height to 1000px and white background
+            iframe_html = f'<iframe srcdoc="{escaped_html}" width="100%" height="1000px" style="border:none; background-color:#ffffff;"></iframe>'
+                
+            return iframe_html
+        except Exception as e:
+            logger.error(f"Graph generation error: {e}")
+            return f"<div><p style='color:red;'>Error generating graph: {str(e)}</p></div>"
 
     def chat_with_ai(self, message, history, model, rag_technique, database, temperature, max_tokens, top_k, similarity_threshold, chunk_size, chunk_overlap, use_reranker, system_prompt, enable_voice_response=False):
         """Chat with AI using Ollama or OpenAI."""
@@ -345,15 +486,32 @@ class AIWorkdeskUI:
             messages.append({"role": "user", "content": message})
             
             # Get response from LLM
-            from ai_workdesk.tools.llm.ollama_client import OllamaClient
-            
-            ollama_client = OllamaClient(
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-            
-            response = ollama_client.chat(messages, model=model)
+            if model.startswith("gpt-"):
+                # OpenAI Models
+                if not hasattr(self, 'openai_client') or not self.openai_client:
+                    self._init_openai_client()
+                
+                if not hasattr(self, 'openai_client') or not self.openai_client:
+                     raise ValueError("OpenAI client not initialized. Please check your API key in settings or .env file.")
+
+                response_obj = self.openai_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                response = response_obj.choices[0].message.content
+            else:
+                # Ollama Models
+                from ai_workdesk.tools.llm.ollama_client import OllamaClient
+                
+                ollama_client = OllamaClient(
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                
+                response = ollama_client.chat(messages, model=model)
             
             # Update history
             history.append({"role": "user", "content": message})
@@ -372,6 +530,15 @@ class AIWorkdeskUI:
         """Export chat."""
         # The JS handles the download, this just needs to return something or nothing
         return None
+
+    def clear_vector_store(self):
+        """Clear the current vector store collection."""
+        try:
+            self.vector_store.delete_collection(self.vector_store.collection_name)
+            return f"✅ Successfully cleared collection: {self.vector_store.collection_name}"
+        except Exception as e:
+            logger.error(f"Error clearing vector store: {e}")
+            return f"❌ Error clearing vector store: {str(e)}"
 
     def create_interface(self) -> gr.Blocks:
         """Create the Gradio interface."""

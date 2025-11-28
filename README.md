@@ -266,9 +266,11 @@ Interact with your documents using advanced RAG techniques:
 - Quality metrics: silhouette score, Davies-Bouldin index
 
 **Knowledge Graph**
-- Entity extraction (People, Organizations, Locations)
-- Relationship visualization
-- Interactive network graph
+- Entity extraction (People, Organizations, Locations, Products, Events)
+- Interactive network visualization with vis.js
+- **Dynamic Filtering**: Adjust max nodes and connection strength in real-time
+- **Premium Aesthetics**: Bright, vibrant node colors with subtle edge rendering
+- **Optimized Performance**: Reduced logging (every 100 documents) for faster processing
 - Graph statistics and metrics
 
 **Metadata Management**
