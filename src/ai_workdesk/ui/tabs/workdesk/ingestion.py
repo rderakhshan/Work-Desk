@@ -102,6 +102,33 @@ def create_ingestion_tab(ui):
                     inputs=[youtube_url, yt_chunk_size, yt_chunk_overlap, yt_summary, yt_playlist],
                     outputs=[yt_status]
                 )
+                
+                gr.Markdown("---")
+                gr.Markdown("### 🧠 AI Summarization & Chat")
+                
+                with gr.Row():
+                    yt_summarize_btn = gr.Button("📝 Summarize Video", variant="secondary")
+                
+                yt_summary_output = gr.Markdown(label="Video Summary")
+                
+                # Hidden state to store video text for chat
+                yt_video_text = gr.State()
+                
+                gr.Markdown("#### 💬 Chat with Video")
+                yt_chatbot = gr.Chatbot(label="Video Chat", height=400, type="messages")
+                yt_msg = gr.Textbox(label="Ask a question about the video", placeholder="What is the main takeaway?")
+                
+                yt_summarize_btn.click(
+                    ui.handle_youtube_summarization,
+                    inputs=[youtube_url],
+                    outputs=[yt_summary_output, yt_video_text, yt_chatbot]
+                )
+                
+                yt_msg.submit(
+                    ui.handle_youtube_chat,
+                    inputs=[yt_msg, yt_chatbot, yt_video_text],
+                    outputs=[yt_msg, yt_chatbot]
+                )
             
             # Audio Tab
             with gr.TabItem("🎙️ Audio"):

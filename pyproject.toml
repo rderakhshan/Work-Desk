@@ -59,6 +59,7 @@ dependencies = [
     "multiprocess==0.70.16",
     "pip>=25.3",
     "faster-whisper>=1.0.0",  # Voice transcription
+    "autogenstudio>=0.0.56",
 ]
 
 # Optional dependency groups for different AI tools

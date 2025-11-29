@@ -23,7 +23,7 @@ def create_chat_lab_tab(ui):
                     show_copy_button=True,
                     elem_classes=["chat-container"],
                     type="messages",
-                    height=350,  # Compact height for better screen fit
+                    height=60,  # Reduced to 1/4 per user request
                     render_markdown=True,
                 )
 

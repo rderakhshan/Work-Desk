@@ -14,6 +14,31 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 📊 **Knowledge Graph**: Visualize entity relationships in your documents
 - 🔍 **Advanced RAG**: Multiple retrieval strategies (Naive, HyDE, Fusion, Hybrid, Graph+Vector)
 
+## 🆕 Recent Updates (November 29, 2024)
+
+### 🚀 Performance & Visualization
+- ✅ **Graph Caching Optimization**: Intelligent caching system that avoids expensive rebuilds (90%+ faster parameter tuning)
+- ✅ **Enhanced Graph Aesthetics**: 
+  - Fixed edge density issues with alpha blending (opacity 0.3)
+  - Thinner, smoother edges for better clarity in dense networks
+  - Background color picker for custom visualization themes
+- ✅ **3D Graph Improvements**: Optimized link opacity and colors for better depth perception
+
+### 🤖 AutoGen Studio Integration
+- ✅ **Seamless UI Integration**: AutoGen Studio embedded directly within the Workdesk
+- ✅ **Full Screen Mode**: Dedicated "Open Full Screen" button for immersive agent workflow management
+- ✅ **Multi-Agent Orchestration**: Create, manage, and run complex agent teams
+
+### 🎥 YouTube Intelligence
+- ✅ **Video Summarization**: One-click generation of concise video summaries
+- ✅ **Interactive Chat**: Chat with video content using RAG
+- ✅ **Metadata Tracking**: Automatic tracking of processed videos in the Metadata Manager
+
+### 🐛 Bug Fixes & Improvements
+- ✅ **UI Stability**: Fixed Gradio app corruption and restored missing methods
+- ✅ **Graph Rendering**: Resolved black area issues in dense graphs
+- ✅ **System Reliability**: Improved error handling for ingestion pipelines
+
 ## 🆕 Recent Updates (November 24, 2024)
 
 ### 🐛 Bug Fixes & Improvements ✅

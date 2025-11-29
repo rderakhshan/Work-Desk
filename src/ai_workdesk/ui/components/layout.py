@@ -67,6 +67,12 @@ body {
     box-shadow: none !important;
 }
 
+/* Remove any vertical lines from tab containers */
+.tab-nav, .tab-content, .tabitem > div {
+    border-left: none !important;
+    border-right: none !important;
+}
+
 /* Chatbot - Floating Glass */
 .chat-container {
     background: rgba(255, 255, 255, 0.1) !important;

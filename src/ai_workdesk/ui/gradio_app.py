@@ -16,6 +16,7 @@ from ai_workdesk.rag.visualization import EmbeddingVisualizer, analyze_cluster_q
 from ai_workdesk.rag.advanced_features import DataCleaner
 from ai_workdesk.tools.llm.ollama_client import OllamaClient
 from ai_workdesk.rag.metadata_store import MetadataStore
+from ai_workdesk.rag.youtube_summarizer import YouTubeSummarizer
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 
@@ -24,7 +25,9 @@ from ai_workdesk.ui.components.layout import create_sidebar_content, CUSTOM_CSS
 from ai_workdesk.ui.tabs.home import create_home_tab
 from ai_workdesk.ui.tabs.workdesk import create_workdesk_tab
 from ai_workdesk.ui.tabs.about import create_about_tab
+from ai_workdesk.tools.autogen_studio_manager import AutoGenStudioManager
 from ai_workdesk.ui.constants import MODELS, EMBEDDING_MODELS, DATABASES
+import atexit
 
 class AIWorkdeskUI:
     """AI Workdesk Gradio UI with authentication and multi-page navigation."""
@@ -58,8 +61,20 @@ class AIWorkdeskUI:
             logger.warning(f"DataCleaner initialization failed: {e}")
             self.data_cleaner = None
         
+        # Initialize YouTube Summarizer
+        self.youtube_summarizer = YouTubeSummarizer()
+
+        # Initialize AutoGen Studio Manager
+        self.autogen_manager = AutoGenStudioManager()
+        try:
+            self.autogen_manager.start_server()
+            atexit.register(self.autogen_manager.stop_server)
+        except Exception as e:
+            logger.error(f"Failed to start AutoGen Studio: {e}")
+
         self._vector_store = None  # Lazy load
         self.page_size = 20
+        self._last_doc_hash = None  # Track document changes for graph caching
 
     def _init_openai_client(self):
         """Initialize OpenAI client if API key is available."""
@@ -136,6 +151,7 @@ class AIWorkdeskUI:
             return "⚠️ Please select a collection"
         success = self.vector_store.switch_collection(name)
         if success:
+            self._invalidate_graph_cache()  # Invalidate cache when switching collections
             return f"✅ Switched to collection: {name}"
         return f"❌ Failed to switch to collection: {name}"
 
@@ -199,6 +215,7 @@ class AIWorkdeskUI:
             
             # Add to vector store
             self.vector_store.add_documents(documents)
+            self._invalidate_graph_cache()  # Invalidate graph cache when documents change
             
             
             # Save metadata
@@ -260,16 +277,13 @@ class AIWorkdeskUI:
         try:
             url_list = [u.strip() for u in urls.split('\n') if u.strip()]
             
-            # This is a simplified version of what was in the original file
-            # Ideally we would call the full logic, but for brevity I'm simplifying
-            # Assuming doc_processor has load_youtube_documents
-            
             documents = self.doc_processor.load_youtube_documents(url_list)
             
             if not documents:
                 return "❌ No transcripts found."
             
             self.vector_store.add_documents(documents)
+            self._invalidate_graph_cache()  # Invalidate graph cache when documents change
             
             # Save metadata for each URL
             try:
@@ -292,6 +306,47 @@ class AIWorkdeskUI:
         except Exception as e:
             logger.error(f"YouTube ingestion error: {e}")
             return f"❌ Error: {str(e)}"
+
+    def handle_youtube_summarization(self, url):
+        """Handle YouTube video summarization."""
+        if not url:
+            return "⚠️ Please enter a YouTube URL.", None, None
+        
+        try:
+            # Get video content
+            content = self.youtube_summarizer.get_video_content(url)
+            text = content['text']
+            
+            # Generate summary
+            summary = self.youtube_summarizer.generate_summary(text)
+            
+            return summary, text, [] # Return summary, full text (hidden state), and empty chat history
+        except Exception as e:
+            logger.error(f"Summarization error: {e}")
+            return f"❌ Error: {str(e)}", None, None
+
+    def handle_youtube_chat(self, message, history, video_text):
+        """Handle chat with YouTube video."""
+        if not message:
+            return "", history
+            
+        if not video_text:
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": "⚠️ Please summarize a video first to load its content."})
+            return "", history
+            
+        try:
+            response = self.youtube_summarizer.chat_with_video(video_text, message, history)
+            
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": response})
+            
+            return "", history
+        except Exception as e:
+            logger.error(f"YouTube chat error: {e}")
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": f"❌ Error: {str(e)}"})
+            return "", history
 
     def handle_audio_transcription(self, audio_file, language):
         """Handle audio transcription."""
@@ -425,7 +480,7 @@ class AIWorkdeskUI:
         """Handle token estimation."""
         return "💰 Cost estimation (Placeholder)"
 
-    def handle_graph_generation(self, max_nodes=100, min_weight=1, viz_mode="2D"):
+    def handle_graph_generation(self, max_nodes=100, min_weight=1, viz_mode="2D", bg_color="#ffffff"):
         """Handle graph generation."""
         try:
             # Fetch all documents from the vector store
@@ -434,8 +489,16 @@ class AIWorkdeskUI:
             if not all_docs:
                 return "<div><p style='text-align:center; padding:20px;'>No documents in the vector store. Please ingest some documents first.</p></div>"
 
-            # Build graph from all documents
-            self.graph_rag.build_graph([doc.page_content for doc in all_docs], clear=True)
+            # Calculate hash of current documents to detect changes
+            current_doc_hash = hash(tuple(sorted([doc.page_content[:100] for doc in all_docs])))
+            
+            # Only rebuild graph if documents changed
+            if self._last_doc_hash != current_doc_hash:
+                logger.info(f"Documents changed, rebuilding graph...")
+                self.graph_rag.build_graph([doc.page_content for doc in all_docs], clear=True)
+                self._last_doc_hash = current_doc_hash
+            else:
+                logger.info("Using cached graph, only updating visualization parameters...")
             
             # Check graph stats first
             stats = self.graph_rag.get_graph_stats()
@@ -455,8 +518,8 @@ class AIWorkdeskUI:
             # Wrap in iframe for isolation to ensure scripts run correctly
             import html
             escaped_html = html.escape(html_content)
-            # Increased height to 1000px and white background
-            iframe_html = f'<iframe srcdoc="{escaped_html}" width="100%" height="1000px" style="border:none; background-color:#ffffff;"></iframe>'
+            # Use user-selected background color
+            iframe_html = f'<iframe srcdoc="{escaped_html}" width="100%" height="1000px" style="border:none; background-color:{bg_color};"></iframe>'
                 
             return iframe_html
         except Exception as e:
@@ -535,10 +598,16 @@ class AIWorkdeskUI:
         """Clear the current vector store collection."""
         try:
             self.vector_store.delete_collection(self.vector_store.collection_name)
+            self._invalidate_graph_cache()  # Invalidate cache when clearing store
             return f"✅ Successfully cleared collection: {self.vector_store.collection_name}"
         except Exception as e:
             logger.error(f"Error clearing vector store: {e}")
             return f"❌ Error clearing vector store: {str(e)}"
+
+    def _invalidate_graph_cache(self):
+        """Invalidate graph cache when documents change."""
+        self._last_doc_hash = None
+        logger.info("Graph cache invalidated")
 
     def create_interface(self) -> gr.Blocks:
         """Create the Gradio interface."""
@@ -693,16 +762,16 @@ class AIWorkdeskUI:
 
 def main() -> None:
     """Main entry point."""
-    print("\\n" + "=" * 60)
+    print("\n" + "=" * 60)
     print("🚀 AI Workdesk - Web Interface")
     print("=" * 60)
-    print("\\n📝 Default Login Credentials:")
+    print("\n📝 Default Login Credentials:")
     print("   Username: admin")
     print("   Password: admin123")
-    print("\\n   Username: demo")
+    print("\n   Username: demo")
     print("   Password: demo123")
-    print("\\n💡 Tip: Edit credentials in src/ai_workdesk/ui/gradio_app.py")
-    print("=" * 60 + "\\n")
+    print("\n💡 Tip: Edit credentials in src/ai_workdesk/ui/gradio_app.py")
+    print("=" * 60 + "\n")
 
     ui = AIWorkdeskUI()
     ui.launch(

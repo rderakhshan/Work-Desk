@@ -137,11 +137,11 @@ class GraphRAG:
             
             logger.info(f"Visualizing graph with {filtered_graph.number_of_nodes()} nodes and {filtered_graph.number_of_edges()} edges (Original: {self.graph.number_of_nodes()}/{self.graph.number_of_edges()})")
 
-            # Define a bright, premium color palette
+            # Define a sharp, vibrant color palette
             colors = [
-                "#FF5733", "#33FF57", "#3357FF", "#FF33F6", "#33FFF6", 
-                "#F6FF33", "#FF8C33", "#8C33FF", "#FF338C", "#33FF8C",
-                "#00C853", "#6200EA", "#D50000", "#AA00FF", "#0091EA"
+                "#E63946", "#06FFA5", "#4361EE", "#F72585", "#06D6A0", 
+                "#FFD60A", "#FF6B35", "#7209B7", "#F15BB5", "#00F5FF",
+                "#00B4D8", "#9B5DE5", "#F94144", "#F3722C", "#43AA8B"
             ]
             
             # Map groups to colors
@@ -192,7 +192,8 @@ class GraphRAG:
         #mynetwork {{
             width: 100%;
             height: 100vh;
-            background-color: #ffffff;
+            background-color: #ffffff !important;
+            background: #ffffff !important;
         }}
         .legend {{
             position: absolute;
@@ -224,35 +225,37 @@ class GraphRAG:
             nodes: {{
                 shape: 'dot',
                 font: {{
-                    size: 16,
-                    color: '#1a1a1a',
+                    size: 14,
+                    color: '#000000',
                     face: 'Segoe UI',
-                    strokeWidth: 2,
+                    strokeWidth: 0,
                     strokeColor: '#ffffff'
                 }},
-                borderWidth: 1,
-                shadow: true,
+                borderWidth: 2,
+                borderWidthSelected: 3,
+                shadow: false,
                 scaling: {{
-                    min: 10,
-                    max: 30
+                    min: 15,
+                    max: 35
                 }}
             }},
             edges: {{
                 font: {{
                     size: 10,
-                    color: '#666666',
+                    color: '#000000',
                     align: 'middle'
                 }},
                 color: {{
-                    color: '#e0e0e0',  /* Very light grey for edges to avoid hairball */
-                    highlight: '#6366f1',
-                    hover: '#6366f1',
-                    opacity: 0.5
+                    color: '#000000',
+                    highlight: '#4361EE',
+                    hover: '#4361EE',
+                    opacity: 0.3
                 }},
                 smooth: {{
                     enabled: true,
                     type: 'continuous'
                 }},
+                width: 0.8,
                 arrows: {{
                     to: {{
                         enabled: false
@@ -260,22 +263,9 @@ class GraphRAG:
                 }}
             }},
             physics: {{
-                enabled: true,
-                barnesHut: {{
-                    gravitationalConstant: -8000,
-                    centralGravity: 0.3,
-                    springLength: 200,
-                    springConstant: 0.04,
-                    damping: 0.09,
-                    avoidOverlap: 0.1
-                }},
-                solver: 'barnesHut',
+                enabled: false,
                 stabilization: {{
-                    enabled: true,
-                    iterations: 1000,
-                    updateInterval: 25,
-                    onlyDynamicEdges: false,
-                    fit: true
+                    enabled: false
                 }}
             }},
             interaction: {{
@@ -292,18 +282,18 @@ class GraphRAG:
             }}
         }};
         
+        
         var network = new vis.Network(container, data, options);
         
-        // Disable physics after stabilization to prevent circular boundary
-        network.once('stabilizationIterationsDone', function() {{
-            network.setOptions({{ physics: false }});
+        // Fit the network to view without physics boundary
+        setTimeout(function() {{
             network.fit({{
                 animation: {{
-                    duration: 500,
+                    duration: 1000,
                     easingFunction: 'easeInOutQuad'
                 }}
             }});
-        }});
+        }}, 100);
     </script>
 </body>
 </html>
@@ -391,7 +381,7 @@ class GraphRAG:
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #000000;
+            background-color: #ffffff;
         }}
         #3d-graph {{
             width: 100vw;
@@ -441,13 +431,6 @@ class GraphRAG:
             .graphData(graphData)
             .nodeLabel('name')
             .nodeAutoColorBy('group')
-            .nodeVal('val')
-            .nodeColor(node => node.color)
-            .linkWidth(link => link.value * 0.5)
-            .linkOpacity(0.3)
-            .linkColor(() => '#ffffff')
-            .backgroundColor('#0a0a0a')
-            .enableNodeDrag(true)
             .enableNavigationControls(true)
             .showNavInfo(false)
             .d3Force('charge').strength(-120)

@@ -49,6 +49,11 @@ def create_visualization_tab(ui):
                     value="2D",
                     label="Visualization Mode"
                 )
+                bg_color = gr.ColorPicker(
+                    label="Background Color",
+                    value="#ffffff",
+                    info="Choose graph background color"
+                )
             with gr.Column(scale=2):
                 max_nodes = gr.Slider(minimum=10, maximum=500, value=100, step=10, label="Max Nodes (Top Connected)")
                 min_weight = gr.Slider(minimum=1, maximum=10, value=1, step=1, label="Min Connection Strength")
@@ -57,23 +62,28 @@ def create_visualization_tab(ui):
         
         graph_btn.click(
             ui.handle_graph_generation,
-            inputs=[max_nodes, min_weight, viz_mode],
+            inputs=[max_nodes, min_weight, viz_mode, bg_color],
             outputs=[graph_plot]
         )
         
         # Dynamic updates on slider release
         max_nodes.release(
             ui.handle_graph_generation,
-            inputs=[max_nodes, min_weight, viz_mode],
+            inputs=[max_nodes, min_weight, viz_mode, bg_color],
             outputs=[graph_plot]
         )
         min_weight.release(
             ui.handle_graph_generation,
-            inputs=[max_nodes, min_weight, viz_mode],
+            inputs=[max_nodes, min_weight, viz_mode, bg_color],
             outputs=[graph_plot]
         )
         viz_mode.change(
             ui.handle_graph_generation,
-            inputs=[max_nodes, min_weight, viz_mode],
+            inputs=[max_nodes, min_weight, viz_mode, bg_color],
+            outputs=[graph_plot]
+        )
+        bg_color.change(
+            ui.handle_graph_generation,
+            inputs=[max_nodes, min_weight, viz_mode, bg_color],
             outputs=[graph_plot]
         )

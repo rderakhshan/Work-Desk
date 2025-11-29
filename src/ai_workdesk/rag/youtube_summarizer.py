@@ -1,177 +1,161 @@
 """
-YouTube video transcript summarizer.
+YouTube Summarizer and Chat Module.
 
-This module provides automatic summarization of YouTube video transcripts
-using LLMs to create comprehensive, structured summaries following a
-scientific paper format.
+This module provides functionality to:
+1. Extract transcripts from YouTube videos.
+2. Generate summaries using an LLM.
+3. Chat with the video content using an LLM.
 """
 
-from typing import Optional
+from typing import List, Dict, Any, Optional
 from loguru import logger
-
+from ai_workdesk.rag.youtube_loader import YouTubeTranscriptLoader
+from ai_workdesk.tools.llm.ollama_client import OllamaClient
+from ai_workdesk.core.config import get_settings
 
 class YouTubeSummarizer:
     """
-    Generates comprehensive, structured summaries of YouTube video transcripts.
-    
-    Uses LLMs to create detailed summaries following a scientific paper format
-    with introduction, detailed analysis, and conclusion sections.
+    Handles YouTube video summarization and chat interactions.
     """
-    
-    def __init__(self, llm_client):
+
+    def __init__(self, llm_client=None):
         """
-        Initialize the YouTube summarizer.
+        Initialize the YouTube Summarizer.
         
         Args:
-            llm_client: LLM client with a chat() method
+            llm_client: Optional LLM client instance. If None, uses default OllamaClient.
         """
-        self.llm = llm_client
-    
-    def summarize(
-        self, 
-        transcript: str, 
-        video_title: str, 
-        max_length: int = 800,
-        channel: Optional[str] = None
-    ) -> str:
+        self.loader = YouTubeTranscriptLoader()
+        self.settings = get_settings()
+        
+        if llm_client:
+            self.llm_client = llm_client
+        else:
+            # Initialize default Ollama client
+            self.llm_client = OllamaClient()
+
+    def get_video_content(self, url: str) -> Dict[str, Any]:
         """
-        Generate a comprehensive, structured summary of a YouTube video transcript.
+        Get transcript and metadata for a video.
         
         Args:
-            transcript: Full video transcript text
-            video_title: Video title for context
-            max_length: Maximum summary length in words (default: 800)
-            channel: Optional channel name for additional context
+            url: YouTube video URL
             
         Returns:
-            Detailed summary string in scientific paper format
+            Dictionary containing 'text', 'metadata', and 'video_id'
         """
+        video_id = self.loader._parse_video_id(url)
+        if not video_id:
+            raise ValueError(f"Invalid YouTube URL: {url}")
+            
         try:
-            # Truncate transcript if too long (use strategic sampling)
-            # Keep first and last portions to capture intro and conclusion
-            if len(transcript) > 12000:
-                logger.info(f"Truncating long transcript ({len(transcript)} chars)")
-                # For longer transcripts, take more content
-                transcript = (
-                    transcript[:6000] + 
-                    "\n\n[... middle section omitted ...]\n\n" + 
-                    transcript[-6000:]
-                )
+            # Fetch transcript segments
+            transcript_segments = self.loader.fetch_transcript(video_id)
             
-            # Build enhanced prompt
-            channel_context = f"\nChannel: {channel}" if channel else ""
+            # Combine text
+            full_text = " ".join([seg['text'] for seg in transcript_segments])
             
-            prompt = f"""You are an expert educational content analyst. Analyze this YouTube video transcript and create a comprehensive, structured summary following a scientific paper format.
-
-Video Title: {video_title}{channel_context}
-
-Transcript:
-{transcript}
-
-Create a detailed summary with the following structure:
-
-## 1. INTRODUCTION & OVERVIEW
-- Identify the main topic and central theme of the video
-- Describe the big picture: What is the overarching concept or problem being addressed?
-- List the key tools, techniques, methodologies, or frameworks mentioned
-- Explain the context and why this topic matters
-- If the video has distinct sections or chapters, list them with their titles
-
-## 2. DETAILED CONTENT ANALYSIS
-Break down the video content systematically:
-
-### Main Concepts
-- Explain each major concept in simple, clear language (as an experienced teacher would)
-- Connect each concept to the big picture established in the introduction
-- Highlight relationships between different ideas
-- Include specific examples, case studies, or demonstrations mentioned
-- Note any formulas, algorithms, or technical details presented
-
-### Key Insights & Takeaways
-- What are the most important lessons or discoveries?
-- What practical applications or implications are discussed?
-- What problems does this solve or what questions does it answer?
-- Any warnings, limitations, or caveats mentioned?
-
-### Supporting Details
-- Important data, statistics, or research findings
-- Expert opinions or quotes
-- Real-world examples or use cases
-- Tools, resources, or references mentioned
-
-## 3. CONCLUSION & SYNTHESIS
-Provide a final summary in TWO formats:
-
-### Narrative Summary (1-2 paragraphs)
-Synthesize the entire video into a cohesive story that:
-- Recaps the main topic and its significance
-- Highlights the most critical insights
-- Connects all major points into a unified understanding
-- Provides actionable takeaways
-
-### Bullet Point Summary
-- 📌 Main Topic: [One sentence]
-- 🎯 Key Objective: [What the video aims to achieve]
-- 💡 Core Insights: [3-5 most important points]
-- 🔧 Tools/Methods: [Techniques or frameworks discussed]
-- ✅ Takeaways: [Practical applications or conclusions]
-- 🔗 Connections: [How this relates to broader context]
-
----
-
-IMPORTANT GUIDELINES:
-- Use clear, professional language suitable for an educated audience
-- Explain technical terms when first introduced
-- Maintain logical flow and coherence throughout
-- Ensure each detail connects back to the main theme
-- Be comprehensive but concise - aim for depth over breadth
-- Use analogies or simplified explanations for complex concepts
-- Preserve the video's teaching style and pedagogical approach
-
-Summary:"""
+            # Fetch metadata
+            metadata = self.loader.fetch_metadata(video_id)
             
-            # Generate summary with moderate temperature for structured output
-            summary = self.llm.chat(prompt)
+            return {
+                "video_id": video_id,
+                "text": full_text,
+                "metadata": metadata,
+                "segments": transcript_segments
+            }
+        except Exception as e:
+            logger.error(f"Error getting video content for {url}: {e}")
+            raise
+
+    def generate_summary(self, text: str, model: Optional[str] = None) -> str:
+        """
+        Generate a summary of the provided text.
+        
+        Args:
+            text: Transcript text to summarize
+            model: Optional model to use
             
-            # Clean up the summary
-            summary = summary.strip()
+        Returns:
+            Summary string
+        """
+        if not text:
+            return "No text provided to summarize."
             
-            # Log summary statistics
-            words = summary.split()
-            logger.info(f"Generated summary: {len(summary)} chars, {len(words)} words")
+        # Truncate text if too long (simple approach for now)
+        # Assuming approx 4 chars per token, 12k chars is ~3k tokens
+        # We'll leave room for the prompt and response
+        max_chars = 12000 
+        if len(text) > max_chars:
+            logger.warning(f"Text too long ({len(text)} chars), truncating to {max_chars} chars for summary.")
+            text = text[:max_chars] + "..."
             
-            # Note: We don't truncate here as the LLM should follow the structure
-            # If it's too long, the LLM settings should be adjusted
-            
-            return summary
-            
+        prompt = f"""
+        Please provide a comprehensive summary of the following YouTube video transcript.
+        Capture the main points, key arguments, and any important conclusions.
+        Format the output with clear headings and bullet points.
+        
+        TRANSCRIPT:
+        {text}
+        
+        SUMMARY:
+        """
+        
+        try:
+            response = self.llm_client.chat(prompt, model=model)
+            return response
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
-            # Return a basic fallback summary
-            return f"Summary unavailable for: {video_title}\n\nError: {str(e)}"
-    
-    def batch_summarize(
-        self, 
-        transcripts: list, 
-        video_titles: list,
-        channels: Optional[list] = None
-    ) -> list:
+            return f"Error generating summary: {str(e)}"
+
+    def chat_with_video(self, text: str, query: str, history: List[Dict], model: Optional[str] = None) -> str:
         """
-        Generate summaries for multiple videos in batch.
+        Chat with the video content.
         
         Args:
-            transcripts: List of transcript texts
-            video_titles: List of video titles
-            channels: Optional list of channel names
+            text: Transcript text
+            query: User question
+            history: Chat history (list of dicts with 'role' and 'content')
+            model: Optional model to use
             
         Returns:
-            List of summary strings
+            LLM response
         """
-        summaries = []
-        channels = channels or [None] * len(transcripts)
+        if not text:
+            return "No video content available to chat with."
+            
+        # Context management
+        # We need to include the transcript in the context, but it might be large.
+        # For a simple "chat with video", we can put the transcript in the system prompt 
+        # or the first user message if it fits.
         
-        for transcript, title, channel in zip(transcripts, video_titles, channels):
-            summary = self.summarize(transcript, title, channel=channel)
-            summaries.append(summary)
+        # Truncate text if needed
+        max_chars = 10000
+        if len(text) > max_chars:
+            text = text[:max_chars] + "... (truncated)"
+            
+        system_prompt = f"""
+        You are a helpful assistant that answers questions about a specific YouTube video.
+        Use the following transcript to answer the user's questions.
+        If the answer is not in the transcript, say so.
         
-        return summaries
+        VIDEO TRANSCRIPT:
+        {text}
+        """
+        
+        # Construct messages
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add history (limit to last few turns to save context)
+        for msg in history[-6:]: 
+            messages.append(msg)
+            
+        # Add current query
+        messages.append({"role": "user", "content": query})
+        
+        try:
+            response = self.llm_client.chat(messages, model=model)
+            return response
+        except Exception as e:
+            logger.error(f"Error chatting with video: {e}")
+            return f"Error: {str(e)}"
