@@ -215,10 +215,108 @@ h1, h2 {
 #viz-plot-container iframe, #graph-plot-container iframe {
     min-height: 600px !important;
 }
+
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+    position: fixed;
+    top: 20px;
+    left: 200px;
+    width: 30px;
+    height: 30px;
+    background: #6366f1 !important;
+    border: none !important;
+    border-radius: 50% !important;
+    cursor: pointer;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white !important;
+    font-size: 18px;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+    background: #4f46e5 !important;
+    transform: scale(1.1);
+}
+
+/* Collapsed Sidebar State */
+.sidebar-container.collapsed {
+    width: 60px !important;
+    min-width: 60px !important;
+}
+
+.sidebar-container.collapsed .sidebar-logo,
+.sidebar-container.collapsed hr,
+.sidebar-container.collapsed .sidebar-spacer {
+    display: none !important;
+}
+
+.sidebar-container.collapsed button {
+    width: 40px !important;
+    padding: 8px !important;
+    font-size: 20px !important;
+    justify-content: center !important;
+}
+
+.sidebar-container.collapsed button span {
+    display: none !important;
+}
+
+.sidebar-container.collapsed + * .sidebar-toggle {
+    left: 60px !important;
+}
+
+/* Smooth Transitions */
+.sidebar-container {
+    transition: all 0.3s ease !important;
+    position: relative;
+}
+
+/* External Link Button Indicator */
+.external-link-btn::after {
+    content: " ↗";
+    font-size: 0.8em;
+    opacity: 0.7;
+}
 """ + DASHBOARD_CSS
 
 def create_sidebar_content():
     """Create the sidebar content."""
+    # Toggle button for sidebar collapse
+    gr.HTML(
+        """
+        <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+            ☰
+        </button>
+        <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar-container');
+            const toggle = document.querySelector('.sidebar-toggle');
+            if (sidebar) {
+                sidebar.classList.toggle('collapsed');
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                localStorage.setItem('sidebarCollapsed', isCollapsed);
+                toggle.style.left = isCollapsed ? '60px' : '200px';
+            }
+        }
+        
+        // Restore sidebar state on load
+        window.addEventListener('load', function() {
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            const sidebar = document.querySelector('.sidebar-container');
+            const toggle = document.querySelector('.sidebar-toggle');
+            if (isCollapsed && sidebar) {
+                sidebar.classList.add('collapsed');
+                if (toggle) toggle.style.left = '60px';
+            }
+        });
+        </script>
+        """
+    )
+    
     gr.HTML(
         """
         <div class="sidebar-logo">
@@ -240,6 +338,7 @@ def create_sidebar_content():
     
     home_btn = gr.Button("🏠 Home", variant="primary", elem_classes=["primary-btn"])
     workdesk_btn = gr.Button("🛠️ Work Desk", variant="secondary", elem_classes=["secondary-btn"])
+    autogen_btn = gr.Button("🤖 AutoGen Studio", variant="secondary", elem_classes=["secondary-btn", "external-link-btn"])
     about_btn = gr.Button("ℹ️ About", variant="secondary", elem_classes=["secondary-btn"])
     
     gr.Markdown("---")
@@ -249,4 +348,4 @@ def create_sidebar_content():
     
     logout_btn = gr.Button("🚪 Logout", variant="secondary", elem_classes=["secondary-btn"])
     
-    return home_btn, workdesk_btn, about_btn, logout_btn
+    return home_btn, workdesk_btn, autogen_btn, about_btn, logout_btn

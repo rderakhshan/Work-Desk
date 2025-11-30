@@ -8,7 +8,6 @@ from ai_workdesk.ui.tabs.workdesk.rag_lab import create_rag_lab_tab
 from ai_workdesk.ui.tabs.workdesk.chat_lab import create_chat_lab_tab
 from ai_workdesk.ui.tabs.workdesk.visualization import create_visualization_tab
 from ai_workdesk.ui.tabs.workdesk.metadata import create_metadata_tab
-from ai_workdesk.ui.tabs.autogen import create_autogen_tab
 
 def create_workdesk_tab(ui):
     """
@@ -33,10 +32,5 @@ def create_workdesk_tab(ui):
             create_rag_lab_tab(ui)
             
             # TAB 3: Chat LAB
-            create_chat_lab_tab(ui)
-
-            # TAB 4: AutoGen Studio
-            with gr.TabItem("🤖 AutoGen Studio"):
-                 create_autogen_tab(ui.autogen_manager)
             
     return workdesk_page

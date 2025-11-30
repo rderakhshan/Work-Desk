@@ -813,7 +813,7 @@ class AIWorkdeskUI:
             with gr.Row():
                 # Sidebar
                 with gr.Column(scale=1, min_width=200, variant="panel", elem_classes=["glass-panel", "sidebar-container"]):
-                    home_btn, workdesk_btn, about_btn, logout_btn = create_sidebar_content()
+                    home_btn, workdesk_btn, autogen_btn, about_btn, logout_btn = create_sidebar_content()
                     gr.Markdown(self.get_auth_status())
                     
                     # Logo at very bottom
@@ -848,6 +848,7 @@ class AIWorkdeskUI:
                     home_btn: gr.update(variant="primary", elem_classes=["primary-btn"]),
                     workdesk_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
                     about_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
+                    autogen_btn: gr.update(variant="secondary", elem_classes=["secondary-btn", "external-link-btn"]),
                 }
 
             def show_workdesk():
@@ -858,6 +859,7 @@ class AIWorkdeskUI:
                     home_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
                     workdesk_btn: gr.update(variant="primary", elem_classes=["primary-btn"]),
                     about_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
+                    autogen_btn: gr.update(variant="secondary", elem_classes=["secondary-btn", "external-link-btn"]),
                 }
 
             def show_about():
@@ -868,24 +870,33 @@ class AIWorkdeskUI:
                     home_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
                     workdesk_btn: gr.update(variant="secondary", elem_classes=["secondary-btn"]),
                     about_btn: gr.update(variant="primary", elem_classes=["primary-btn"]),
+                    autogen_btn: gr.update(variant="secondary", elem_classes=["secondary-btn", "external-link-btn"]),
                 }
 
             home_btn.click(
                 show_home,
                 None,
-                [home_page, workdesk_page, about_page, home_btn, workdesk_btn, about_btn],
+                [home_page, workdesk_page, about_page, home_btn, workdesk_btn, autogen_btn, about_btn],
             )
 
             workdesk_btn.click(
                 show_workdesk,
                 None,
-                [home_page, workdesk_page, about_page, home_btn, workdesk_btn, about_btn],
+                [home_page, workdesk_page, about_page, home_btn, workdesk_btn, autogen_btn, about_btn],
             )
 
             about_btn.click(
                 show_about,
                 None,
-                [home_page, workdesk_page, about_page, home_btn, workdesk_btn, about_btn],
+                [home_page, workdesk_page, about_page, home_btn, workdesk_btn, autogen_btn, about_btn],
+            )
+            
+            # AutoGen Studio handler (opens in new tab)
+            autogen_btn.click(
+                None,
+                None,
+                None,
+                js="() => { window.open('http://localhost:8081', '_blank'); }"
             )
             
             # Logout handler (Javascript redirect)
