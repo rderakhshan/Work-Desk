@@ -38,15 +38,12 @@ def create_autogen_tab(manager: AutoGenStudioManager) -> gr.Blocks:
                 <head>
                     <title>AutoGen Studio - Full Screen</title>
                     <style>
-                        body {{ margin: 0; padding: 0; background-color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: system-ui, -apple-system, sans-serif; }}
-                        .container {{ width: 95%; height: 95%; max-width: 1600px; background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); overflow: hidden; border: 1px solid #e2e8f0; }}
-                        iframe {{ width: 100%; height: 100%; border: none; }}
+                        body {{ margin: 0; padding: 0; overflow: hidden; }}
+                        iframe {{ width: 100vw; height: 100vh; border: none; display: block; }}
                     </style>
                 </head>
                 <body>
-                    <div class="container">
-                        <iframe src="${{url}}"></iframe>
-                    </div>
+                    <iframe src="${{url}}"></iframe>
                 </body>
                 </html>
             `);

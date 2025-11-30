@@ -55,7 +55,7 @@ class GraphRAG:
         
         for i, doc_text in enumerate(documents):
             entities = self.extract_entities(doc_text)
-            if (i + 1) % 100 == 0:
+            if (i + 1) % 1000 == 0:
                 logger.info(f"Processed {i + 1}/{len(documents)} documents...")
             
             # Add nodes
@@ -111,7 +111,7 @@ class GraphRAG:
             return self.visualize_graph_2d(output_path, max_nodes, min_edge_weight)
     
     def visualize_graph_2d(self, output_path: str = "graph.html", max_nodes: int = 100, min_edge_weight: int = 1) -> str:
-        """Generate 2D visualization using vis.js."""
+        """Generate 2D visualization using vis.js with Flourish-style aesthetics."""
         if self.graph.number_of_nodes() == 0:
             return ""
             
@@ -122,47 +122,66 @@ class GraphRAG:
             edges_to_remove = [(u, v) for u, v, d in filtered_graph.edges(data=True) if d.get('weight', 1) < min_edge_weight]
             filtered_graph.remove_edges_from(edges_to_remove)
             
-            # 2. Remove isolated nodes after edge filtering (optional, but good for cleanliness)
-            # isolated_nodes = list(nx.isolates(filtered_graph))
-            # filtered_graph.remove_nodes_from(isolated_nodes)
-            
-            # 3. Filter nodes by degree (keep top max_nodes)
+            # 2. Filter nodes by degree (keep top max_nodes)
             if filtered_graph.number_of_nodes() > max_nodes:
-                # Calculate degrees
                 degrees = dict(filtered_graph.degree())
-                # Sort by degree (descending)
                 top_nodes = sorted(degrees, key=degrees.get, reverse=True)[:max_nodes]
-                # Create subgraph with only top nodes
                 filtered_graph = filtered_graph.subgraph(top_nodes).copy()
             
-            logger.info(f"Visualizing graph with {filtered_graph.number_of_nodes()} nodes and {filtered_graph.number_of_edges()} edges (Original: {self.graph.number_of_nodes()}/{self.graph.number_of_edges()})")
+            logger.info(f"Visualizing graph with {filtered_graph.number_of_nodes()} nodes and {filtered_graph.number_of_edges()} edges")
 
-            # Define a sharp, vibrant color palette
+            # --- Flourish-style Enhancements ---
+
+            # 1. Community Detection for Coloring
+            try:
+                from networkx.algorithms import community
+                # Use greedy modularity communities
+                communities = list(community.greedy_modularity_communities(filtered_graph))
+                # Create a map of node -> community_id
+                community_map = {}
+                for i, comm in enumerate(communities):
+                    for node in comm:
+                        community_map[node] = i
+            except ImportError:
+                logger.warning("NetworkX community module not found, falling back to connected components")
+                community_map = {node: 0 for node in filtered_graph.nodes()}
+
+            # 2. Dynamic Node Sizing based on Degree
+            degrees = dict(filtered_graph.degree())
+            max_degree = max(degrees.values()) if degrees else 1
+            min_degree = min(degrees.values()) if degrees else 1
+            
+            # Define a premium color palette (Flourish-inspired)
             colors = [
                 "#E63946", "#06FFA5", "#4361EE", "#F72585", "#06D6A0", 
                 "#FFD60A", "#FF6B35", "#7209B7", "#F15BB5", "#00F5FF",
                 "#00B4D8", "#9B5DE5", "#F94144", "#F3722C", "#43AA8B"
             ]
             
-            # Map groups to colors
-            groups = set(nx.get_node_attributes(filtered_graph, 'group').values())
-            group_colors = {group: colors[i % len(colors)] for i, group in enumerate(groups)}
-
-            # Convert NetworkX graph to vis.js format manually
+            # Convert NetworkX graph to vis.js format
             nodes_data = []
             for node in filtered_graph.nodes():
                 node_attrs = filtered_graph.nodes[node]
-                # Assign colors based on group/label
-                group = node_attrs.get('group', 'default')
-                color = group_colors.get(group, '#97C2FC')
                 
+                # Color by community
+                comm_id = community_map.get(node, 0)
+                color = colors[comm_id % len(colors)]
+                
+                # Size by degree (Linear interpolation: min_size=15, max_size=45)
+                degree = degrees.get(node, 0)
+                # Normalize degree between 0 and 1
+                norm_degree = (degree - min_degree) / (max_degree - min_degree) if max_degree > min_degree else 0.5
+                size = 15 + (norm_degree * 30)
+
                 nodes_data.append({
                     "id": node,
                     "label": node,
-                    "title": node_attrs.get('title', node),
-                    "group": group,
-                    "value": node_attrs.get('value', 1),
-                    "color": color
+                    "title": f"{node} (Connections: {degree})",
+                    "group": comm_id,
+                    "value": size, # vis.js uses 'value' for scaling if enabled, or we can set 'size' directly
+                    "size": size,
+                    "color": color,
+                    "font": {"size": 14 + (norm_degree * 10)} # Scale font with node
                 })
             
             edges_data = []
@@ -171,12 +190,11 @@ class GraphRAG:
                 edges_data.append({
                     "from": source,
                     "to": target,
-                    "label": edge_attrs.get('label', ''),
-                    "title": edge_attrs.get('title', ''),
-                    "width": edge_attrs.get('weight', 1)
+                    "title": f"Co-occurs {edge_attrs.get('weight', 1)}x",
+                    "width": edge_attrs.get('weight', 1) * 0.5 # Thinner edges
                 })
             
-            # Create custom HTML without loading bar
+            # Create custom HTML
             html_template = f"""
 <!DOCTYPE html>
 <html>
@@ -184,29 +202,8 @@ class GraphRAG:
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"></script>
     <style>
-        body {{
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }}
-        #mynetwork {{
-            width: 100%;
-            height: 100vh;
-            background-color: #ffffff !important;
-            background: #ffffff !important;
-        }}
-        .legend {{
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            z-index: 1000;
-            max-height: 90vh;
-            overflow-y: auto;
-        }}
+        body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }}
+        #mynetwork {{ width: 100%; height: 100vh; background-color: #ffffff !important; }}
     </style>
 </head>
 <body>
@@ -214,86 +211,60 @@ class GraphRAG:
     <script type="text/javascript">
         var nodes = new vis.DataSet({json.dumps(nodes_data)});
         var edges = new vis.DataSet({json.dumps(edges_data)});
-        
         var container = document.getElementById('mynetwork');
-        var data = {{
-            nodes: nodes,
-            edges: edges
-        }};
+        var data = {{ nodes: nodes, edges: edges }};
         
         var options = {{
             nodes: {{
                 shape: 'dot',
                 font: {{
-                    size: 14,
-                    color: '#000000',
                     face: 'Segoe UI',
-                    strokeWidth: 0,
+                    color: '#333333',
+                    strokeWidth: 2,
                     strokeColor: '#ffffff'
                 }},
                 borderWidth: 2,
-                borderWidthSelected: 3,
-                shadow: false,
-                scaling: {{
-                    min: 15,
-                    max: 35
-                }}
+                shadow: true
             }},
             edges: {{
-                font: {{
-                    size: 10,
-                    color: '#000000',
-                    align: 'middle'
-                }},
                 color: {{
-                    color: '#000000',
+                    color: '#cccccc',
                     highlight: '#4361EE',
                     hover: '#4361EE',
                     opacity: 0.3
                 }},
-                smooth: {{
-                    enabled: true,
-                    type: 'continuous'
-                }},
-                width: 0.8,
-                arrows: {{
-                    to: {{
-                        enabled: false
-                    }}
-                }}
+                smooth: {{ enabled: true, type: 'continuous', roundness: 0.5 }},
+                selectionWidth: 2,
+                hoverWidth: 1.5
             }},
             physics: {{
-                enabled: false,
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {{
+                    gravitationalConstant: -50,
+                    centralGravity: 0.01,
+                    springLength: 100,
+                    springConstant: 0.08,
+                    damping: 0.4,
+                    avoidOverlap: 0.5
+                }},
                 stabilization: {{
-                    enabled: false
+                    enabled: true,
+                    iterations: 1000,
+                    updateInterval: 25
                 }}
             }},
             interaction: {{
                 hover: true,
                 tooltipDelay: 200,
-                hideEdgesOnDrag: true,
-                navigationButtons: false,
-                keyboard: false
+                hideEdgesOnDrag: true
             }},
             layout: {{
-                randomSeed: 42,
-                improvedLayout: true,
-                clusterThreshold: 150
+                randomSeed: 42
             }}
         }};
         
-        
         var network = new vis.Network(container, data, options);
-        
-        // Fit the network to view without physics boundary
-        setTimeout(function() {{
-            network.fit({{
-                animation: {{
-                    duration: 1000,
-                    easingFunction: 'easeInOutQuad'
-                }}
-            }});
-        }}, 100);
     </script>
 </body>
 </html>
@@ -316,7 +287,7 @@ class GraphRAG:
             return ""
     
     def visualize_graph_3d(self, output_path: str = "graph.html", max_nodes: int = 100, min_edge_weight: int = 1) -> str:
-        """Generate 3D visualization using 3d-force-graph library."""
+        """Generate 3D visualization using 3d-force-graph library with Flourish-style aesthetics."""
         if self.graph.number_of_nodes() == 0:
             return ""
             
@@ -335,6 +306,24 @@ class GraphRAG:
             
             logger.info(f"Visualizing 3D graph with {filtered_graph.number_of_nodes()} nodes and {filtered_graph.number_of_edges()} edges")
 
+            # --- Flourish-style Enhancements ---
+
+            # 1. Community Detection for Coloring
+            try:
+                from networkx.algorithms import community
+                communities = list(community.greedy_modularity_communities(filtered_graph))
+                community_map = {}
+                for i, comm in enumerate(communities):
+                    for node in comm:
+                        community_map[node] = i
+            except ImportError:
+                community_map = {node: 0 for node in filtered_graph.nodes()}
+
+            # 2. Dynamic Node Sizing based on Degree
+            degrees = dict(filtered_graph.degree())
+            max_degree = max(degrees.values()) if degrees else 1
+            min_degree = min(degrees.values()) if degrees else 1
+
             # Define a bright, premium color palette
             colors = [
                 "#FF5733", "#33FF57", "#3357FF", "#FF33F6", "#33FFF6", 
@@ -342,23 +331,27 @@ class GraphRAG:
                 "#00C853", "#6200EA", "#D50000", "#AA00FF", "#0091EA"
             ]
             
-            # Map groups to colors
-            groups = set(nx.get_node_attributes(filtered_graph, 'group').values())
-            group_colors = {group: colors[i % len(colors)] for i, group in enumerate(groups)}
-
             # Convert NetworkX graph to 3d-force-graph format
             nodes_data = []
             for node in filtered_graph.nodes():
                 node_attrs = filtered_graph.nodes[node]
-                group = node_attrs.get('group', 'default')
-                color = group_colors.get(group, '#97C2FC')
                 
+                # Color by community
+                comm_id = community_map.get(node, 0)
+                color = colors[comm_id % len(colors)]
+                
+                # Size by degree
+                degree = degrees.get(node, 0)
+                norm_degree = (degree - min_degree) / (max_degree - min_degree) if max_degree > min_degree else 0.5
+                size = 5 + (norm_degree * 15) # Base size 5, max extra 15
+
                 nodes_data.append({
                     "id": node,
                     "name": node,
-                    "group": group,
-                    "val": node_attrs.get('value', 1),
-                    "color": color
+                    "group": comm_id,
+                    "val": size,
+                    "color": color,
+                    "desc": f"Connections: {degree}"
                 })
             
             links_data = []
@@ -370,54 +363,36 @@ class GraphRAG:
                     "value": edge_attrs.get('weight', 1)
                 })
             
-            # Create 3D HTML using 3d-force-graph
+            # Create 3D HTML using 3d-force-graph with advanced visual effects
             html_template = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
-        body {{
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #ffffff;
-        }}
-        #3d-graph {{
-            width: 100vw;
-            height: 100vh;
-        }}
+        body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: #000003; }}
+        #3d-graph {{ width: 100vw; height: 100vh; }}
         .controls {{
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            z-index: 1000;
-            font-size: 12px;
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(10px);
+            padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+            color: #e0e0e0; font-size: 12px; pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }}
-        .controls h3 {{
-            margin: 0 0 10px 0;
-            font-size: 14px;
-            color: #333;
-        }}
-        .controls p {{
-            margin: 5px 0;
-            color: #666;
-        }}
+        .controls h3 {{ margin: 0 0 10px 0; font-size: 14px; color: #fff; font-weight: 600; }}
     </style>
     <script src="https://unpkg.com/3d-force-graph"></script>
+    <script src="https://unpkg.com/three"></script>
+    <script src="https://unpkg.com/three-spritetext"></script>
+    <script src="https://unpkg.com/three/examples/jsm/postprocessing/EffectComposer.js"></script>
+    <script src="https://unpkg.com/three/examples/jsm/postprocessing/RenderPass.js"></script>
+    <script src="https://unpkg.com/three/examples/jsm/postprocessing/UnrealBloomPass.js"></script>
 </head>
 <body>
     <div class="controls">
-        <h3>🎮 3D Graph Controls</h3>
-        <p><strong>Rotate:</strong> Left click + drag</p>
-        <p><strong>Zoom:</strong> Scroll wheel</p>
-        <p><strong>Pan:</strong> Right click + drag</p>
-        <p><strong>Nodes:</strong> {len(nodes_data)}</p>
-        <p><strong>Edges:</strong> {len(links_data)}</p>
+        <h3>🌌 Neural Graph 3D</h3>
+        <p>Left click: Rotate | Right click: Pan | Scroll: Zoom</p>
+        <p>Nodes: {len(nodes_data)} | Edges: {len(links_data)}</p>
     </div>
     <div id="3d-graph"></div>
     <script>
@@ -425,41 +400,68 @@ class GraphRAG:
             nodes: {json.dumps(nodes_data)},
             links: {json.dumps(links_data)}
         }};
-        
+
+        // Calculate degree for each node to determine label visibility
+        const nodeDegrees = {{}};
+        graphData.links.forEach(link => {{
+            nodeDegrees[link.source] = (nodeDegrees[link.source] || 0) + 1;
+            nodeDegrees[link.target] = (nodeDegrees[link.target] || 0) + 1;
+        }});
+
         const Graph = ForceGraph3D()
             (document.getElementById('3d-graph'))
             .graphData(graphData)
-            .nodeLabel('name')
-            .nodeAutoColorBy('group')
-            .enableNavigationControls(true)
+            .nodeColor('color')
+            .nodeVal('val')
+            .nodeResolution(24) // Smoother spheres
+            .nodeOpacity(0.9)
+            .linkWidth(link => 0.3)
+            .linkOpacity(0.2)
+            .linkDirectionalParticles(2) // Add particles for "flow"
+            .linkDirectionalParticleWidth(1.5)
+            .linkDirectionalParticleSpeed(0.005)
+            .backgroundColor('#000003')
             .showNavInfo(false)
-            .d3Force('charge').strength(-120)
-            .d3Force('link').distance(link => 30 / link.value);
-        
-        // Camera controls
-        Graph.cameraPosition({{ z: 300 }});
-        
-        // Node click handler
-        Graph.onNodeClick(node => {{
-            // Look at node
-            const distance = 100;
-            const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
-            Graph.cameraPosition(
-                {{ x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }},
-                node,
-                1000
-            );
-        }});
-        
-        // Auto-rotate
+            
+            // Custom Node Object (Text Sprite)
+            .nodeThreeObject(node => {{
+                // Only show labels for important nodes (degree > 2) or if graph is small
+                const degree = nodeDegrees[node.id] || 0;
+                if (degree < 2 && graphData.nodes.length > 50) return null;
+
+                const sprite = new SpriteText(node.name);
+                sprite.color = node.color;
+                sprite.textHeight = 4 + (node.val / 5); // Scale text with node size
+                sprite.padding = 2;
+                sprite.backgroundColor = 'rgba(0,0,0,0.5)';
+                sprite.borderRadius = 4;
+                return sprite;
+            }})
+            .nodeThreeObjectExtend(true) // Draw sphere AND text
+
+            // Physics Tuning
+            .d3Force('charge', d3.forceManyBody().strength(-150)) // Stronger repulsion
+            .d3Force('link', d3.forceLink().distance(link => 60).strength(0.1)) // Longer links
+            
+            // Post-Processing (Bloom)
+            .onEngineStop(() => Graph.zoomToFit(400)); // Auto-fit on settle
+
+        // Add Bloom Effect
+        const bloomPass = new THREE.UnrealBloomPass();
+        bloomPass.strength = 1.5;
+        bloomPass.radius = 0.4;
+        bloomPass.threshold = 0.1;
+        Graph.postProcessingComposer().addPass(bloomPass);
+
+        // Camera Orbit
         let angle = 0;
         setInterval(() => {{
-            angle += 0.2;
+            angle += 0.0005;
             Graph.cameraPosition({{
-                x: 300 * Math.sin(angle * Math.PI / 180),
-                z: 300 * Math.cos(angle * Math.PI / 180)
+                x: 500 * Math.sin(angle),
+                z: 500 * Math.cos(angle)
             }});
-        }}, 50);
+        }}, 10);
     </script>
 </body>
 </html>

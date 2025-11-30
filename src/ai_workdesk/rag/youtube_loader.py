@@ -138,12 +138,7 @@ class YouTubeTranscriptLoader:
     
     def fetch_transcript(self, video_id: str) -> List[Dict[str, Any]]:
         """
-        Fetch transcript for a YouTube video.
-        
-        Language priority:
-        1. English manual transcript
-        2. English auto-generated transcript
-        3. First available transcript
+        Fetch transcript for a YouTube video with yt-dlp fallback.
         
         Args:
             video_id: YouTube video ID
@@ -156,56 +151,68 @@ class YouTubeTranscriptLoader:
             NoTranscriptFound: If no transcripts are available
             VideoUnavailable: If video is private or deleted
         """
+        # Try youtube-transcript-api first
         try:
-            # Get available transcripts
-            # Note: Using instance method .list() for installed version compatibility
-            api = YouTubeTranscriptApi()
-            transcript_list = api.list(video_id)
+            transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en'])
+            logger.info(f"Fetched {len(transcript_data)} transcript segments for {video_id}")
+            return transcript_data
+        except Exception as api_error:
+            logger.warning(f"youtube-transcript-api failed for {video_id}: {api_error}. Trying yt-dlp fallback...")
             
-            # Try to get English manual transcript first
-            try:
-                transcript = transcript_list.find_manually_created_transcript(['en'])
-                logger.info(f"Using manual English transcript for {video_id}")
-            except NoTranscriptFound:
-                # Try English auto-generated
-                try:
-                    transcript = transcript_list.find_generated_transcript(['en'])
-                    logger.info(f"Using auto-generated English transcript for {video_id}")
-                except NoTranscriptFound:
-                    # Get first available transcript
-                    transcript = next(iter(transcript_list))
-                    logger.info(f"Using {transcript.language} transcript for {video_id}")
+        # Fallback to yt-dlp subtitle extraction
+        try:
+            import json
+            import tempfile
+            import os
             
-            # Fetch the transcript data
-            transcript_data = transcript.fetch()
-            logger.info(f"Fetched {len(transcript_data)} transcript segments")
+            url = f"https://www.youtube.com/watch?v={video_id}"
             
-            # Convert to dicts if they are objects (compatibility for v1.2.3)
-            cleaned_data = []
-            for segment in transcript_data:
-                if hasattr(segment, 'text'):
-                    cleaned_data.append({
-                        'text': segment.text,
-                        'start': segment.start,
-                        'duration': segment.duration
-                    })
-                else:
-                    cleaned_data.append(segment)
-            
-            return cleaned_data
-            
-        except TranscriptsDisabled:
-            logger.error(f"Transcripts are disabled for video {video_id}")
-            raise
-        except NoTranscriptFound:
-            logger.error(f"No transcripts found for video {video_id}")
-            raise
-        except VideoUnavailable:
-            logger.error(f"Video {video_id} is unavailable (private or deleted)")
-            raise
+            # Create temp directory for subtitles
+            with tempfile.TemporaryDirectory() as temp_dir:
+                subtitle_file = os.path.join(temp_dir, f"{video_id}.en.json")
+                
+                opts = {
+                    'skip_download': True,
+                    'writesubtitles': True,
+                    'writeautomaticsub': True,
+                    'subtitleslangs': ['en'],
+                    'subtitlesformat': 'json3',
+                    'outtmpl': os.path.join(temp_dir, video_id),
+                    'quiet': True,
+                    'no_warnings': True,
+                }
+                
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+                
+                # Find the subtitle file (might have different extensions)
+                subtitle_files = [f for f in os.listdir(temp_dir) if f.endswith('.json3')]
+                if not subtitle_files:
+                    raise NoTranscriptFound(f"No subtitles found for {video_id}")
+                
+                subtitle_path = os.path.join(temp_dir, subtitle_files[0])
+                
+                # Parse JSON3 subtitle format
+                with open(subtitle_path, 'r', encoding='utf-8') as f:
+                    subtitle_data = json.load(f)
+                
+                # Convert to standard format
+                transcript_data = []
+                for event in subtitle_data.get('events', []):
+                    if 'segs' in event:
+                        text = ''.join(seg.get('utf8', '') for seg in event['segs'])
+                        transcript_data.append({
+                            'text': text.strip(),
+                            'start': event.get('tStartMs', 0) / 1000.0,
+                            'duration': event.get('dDurationMs', 0) / 1000.0
+                        })
+                
+                logger.info(f"Fetched {len(transcript_data)} transcript segments via yt-dlp for {video_id}")
+                return transcript_data
+                
         except Exception as e:
-            logger.error(f"Unexpected error fetching transcript for {video_id}: {e}")
-            raise
+            logger.error(f"All transcript methods failed for {video_id}: {e}")
+            raise Exception(f"Could not fetch transcript for {video_id}. Please verify captions are enabled.")
     
     def fetch_metadata(self, video_id: str) -> Dict[str, Any]:
         """

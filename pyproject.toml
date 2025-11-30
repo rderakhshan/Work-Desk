@@ -60,6 +60,7 @@ dependencies = [
     "pip>=25.3",
     "faster-whisper>=1.0.0",  # Voice transcription
     "autogenstudio>=0.0.56",
+    "msoffcrypto-tool>=5.0.0", # Required for Office file processing
 ]
 
 # Optional dependency groups for different AI tools

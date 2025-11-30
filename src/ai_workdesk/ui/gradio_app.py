@@ -71,6 +71,28 @@ class AIWorkdeskUI:
             atexit.register(self.autogen_manager.stop_server)
         except Exception as e:
             logger.error(f"Failed to start AutoGen Studio: {e}")
+        
+        # Initialize Obsidian Exporter
+        try:
+            from ai_workdesk.tools.obsidian_exporter import ObsidianExporter
+            vault_path = os.getenv("OBSIDIAN_VAULT_PATH")
+            
+            # Fallback: Try known path if env var is missing
+            if not vault_path:
+                known_path = r"C:\Users\Riemann\Documents\AI Engineering\AI Engineering\AI Engeeneering"
+                if os.path.exists(known_path):
+                    vault_path = known_path
+                    logger.info(f"Using auto-detected Obsidian vault: {vault_path}")
+            
+            if vault_path and os.path.exists(vault_path):
+                self.obsidian_exporter = ObsidianExporter(vault_path)
+                logger.info(f"Obsidian exporter initialized with vault: {vault_path}")
+            else:
+                self.obsidian_exporter = None
+                logger.warning("Obsidian vault path not configured or doesn't exist")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Obsidian exporter: {e}")
+            self.obsidian_exporter = None
 
         self._vector_store = None  # Lazy load
         self.page_size = 20
@@ -313,12 +335,15 @@ class AIWorkdeskUI:
             return "⚠️ Please enter a YouTube URL.", None, None
         
         try:
+            logger.info(f"Starting summarization for {url}")
             # Get video content
             content = self.youtube_summarizer.get_video_content(url)
             text = content['text']
+            logger.info(f"Retrieved transcript length: {len(text)} chars")
             
             # Generate summary
             summary = self.youtube_summarizer.generate_summary(text)
+            logger.info(f"Generated summary length: {len(summary)} chars")
             
             return summary, text, [] # Return summary, full text (hidden state), and empty chat history
         except Exception as e:
@@ -344,9 +369,105 @@ class AIWorkdeskUI:
             return "", history
         except Exception as e:
             logger.error(f"YouTube chat error: {e}")
-            history.append({"role": "user", "content": message})
-            history.append({"role": "assistant", "content": f"❌ Error: {str(e)}"})
+            history.append({{"role": "user", "content": message}})
+            history.append({{"role": "assistant", "content": f"❌ Error: {str(e)}"}})
             return "", history
+
+    def handle_obsidian_export(self, url, summary, video_text, chat_history):
+        """Export YouTube video summary and chat to Obsidian vault."""
+        if not self.obsidian_exporter:
+            return "❌ Obsidian exporter not configured. Please set OBSIDIAN_VAULT_PATH in your .env file."
+        
+        if not url:
+            return "⚠️ Please enter a YouTube URL first."
+        
+        if not summary:
+            return "⚠️ Please summarize the video first before exporting."
+        
+        try:
+            # Extract video ID and get metadata
+            from ai_workdesk.rag.youtube_loader import YouTubeTranscriptLoader
+            loader = YouTubeTranscriptLoader()
+            video_id = loader._parse_video_id(url)
+            
+            if not video_id:
+                return "❌ Invalid YouTube URL."
+            
+            # Get video metadata
+            metadata = loader.fetch_metadata(video_id)
+            
+            # Format chat history if available
+            chat_text = None
+            if chat_history and len(chat_history) > 0:
+                chat_lines = []
+                for msg in chat_history:
+                    role = msg.get("role", "").upper()
+                    content = msg.get("content", "")
+                    if role == "USER":
+                        chat_lines.append(f"**Q:** {content}")
+                    elif role == "ASSISTANT":
+                        chat_lines.append(f"**A:** {content}\n")
+                chat_text = "\n".join(chat_lines)
+            
+            # Export to Obsidian
+            note_path = self.obsidian_exporter.export_youtube_note(
+                video_title=metadata.get('source', 'YouTube Video'),
+                video_url=url,
+                channel=metadata.get('channel', 'Unknown'),
+                summary=summary,
+                transcript=video_text if video_text else None,
+                chat_history=chat_text,
+                metadata={{
+                    'duration': metadata.get('duration', 0),
+                    'view_count': metadata.get('view_count', 0)
+                }}
+            )
+            
+            return f"✅ Successfully exported to Obsidian!\n📝 Note saved at: {note_path}"
+            
+        except Exception as e:
+            logger.error(f"Obsidian export error: {e}")
+            return f"❌ Export failed: {str(e)}"
+
+    def handle_chat_obsidian_export(self, chat_history):
+        """Export generic chat history to Obsidian vault."""
+        if not self.obsidian_exporter:
+            return "❌ Obsidian exporter not configured. Please set OBSIDIAN_VAULT_PATH in your .env file."
+        
+        if not chat_history:
+            return "⚠️ Chat history is empty."
+        
+        try:
+            # Format chat history
+            chat_lines = []
+            first_user_msg = "Generic Chat"
+            
+            for msg in chat_history:
+                role = msg.get("role", "").upper()
+                content = msg.get("content", "")
+                
+                # Use first user message as title (truncated)
+                if role == "USER" and first_user_msg == "Generic Chat":
+                    first_user_msg = content[:50] + "..." if len(content) > 50 else content
+                
+                if role == "USER":
+                    chat_lines.append(f"**Q:** {content}")
+                elif role == "ASSISTANT":
+                    chat_lines.append(f"**A:** {content}\n")
+            
+            chat_text = "\n".join(chat_lines)
+            
+            # Export to Obsidian
+            note_path = self.obsidian_exporter.export_chat_note(
+                title=first_user_msg,
+                chat_history=chat_text
+            )
+            
+            return f"✅ Successfully exported to Obsidian!\n📝 Note saved at: {note_path}"
+            
+        except Exception as e:
+            logger.error(f"Obsidian export error: {e}")
+            return f"❌ Export failed: {str(e)}"
 
     def handle_audio_transcription(self, audio_file, language):
         """Handle audio transcription."""
@@ -525,6 +646,32 @@ class AIWorkdeskUI:
         except Exception as e:
             logger.error(f"Graph generation error: {e}")
             return f"<div><p style='color:red;'>Error generating graph: {str(e)}</p></div>"
+
+    def get_graph_html_path(self, max_nodes=100, min_weight=1, viz_mode="2D"):
+        """Generate graph and return file path for full screen view."""
+        try:
+            # Handle None values from Gradio (use defaults)
+            max_nodes = max_nodes if max_nodes is not None else 100
+            min_weight = min_weight if min_weight is not None else 1
+            viz_mode = viz_mode if viz_mode is not None else "2D"
+            
+            # Ensure graph is built (reuse existing logic if possible, but for now just ensure it exists)
+            all_docs = self.vector_store.get_all_documents()
+            if not all_docs:
+                return None
+                
+            current_doc_hash = hash(tuple(sorted([doc.page_content[:100] for doc in all_docs])))
+            
+            if self._last_doc_hash != current_doc_hash:
+                self.graph_rag.build_graph([doc.page_content for doc in all_docs], clear=True)
+                self._last_doc_hash = current_doc_hash
+            
+            # Generate graph HTML
+            html_path = self.graph_rag.visualize_graph(max_nodes=int(max_nodes), min_edge_weight=int(min_weight), mode=viz_mode)
+            return html_path
+        except Exception as e:
+            logger.error(f"Error getting graph path: {e}")
+            return None
 
     def chat_with_ai(self, message, history, model, rag_technique, database, temperature, max_tokens, top_k, similarity_threshold, chunk_size, chunk_overlap, use_reranker, system_prompt, enable_voice_response=False):
         """Chat with AI using Ollama or OpenAI."""
@@ -760,6 +907,10 @@ class AIWorkdeskUI:
             )
 
 
+# Create UI instance and demo globally for Gradio hot reloading
+ui = AIWorkdeskUI()
+demo = ui.create_interface()
+
 def main() -> None:
     """Main entry point."""
     print("\n" + "=" * 60)
@@ -773,21 +924,14 @@ def main() -> None:
     print("\n💡 Tip: Edit credentials in src/ai_workdesk/ui/gradio_app.py")
     print("=" * 60 + "\n")
 
-    ui = AIWorkdeskUI()
-    ui.launch(
-        share=False,  # Set to True for public link
-        server_port=None, # Allow dynamic port allocation
-        auth=True,  # Enable authentication
+    # Launch using the globally created demo
+    demo.launch(
+        auth=ui.authenticate,
+        auth_message="🔐 Please login to AI Workdesk",
+        share=False,
+        server_port=7860,
+        favicon_path=None,
     )
-
-
-# Expose demo for Gradio CLI auto-reload
-if __name__ != "__main__":
-    try:
-        _ui = AIWorkdeskUI()
-        demo = _ui.create_interface()
-    except Exception:
-        pass
 
 if __name__ == "__main__":
     main()

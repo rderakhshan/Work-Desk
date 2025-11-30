@@ -57,6 +57,7 @@ def create_visualization_tab(ui):
             with gr.Column(scale=2):
                 max_nodes = gr.Slider(minimum=10, maximum=500, value=100, step=10, label="Max Nodes (Top Connected)")
                 min_weight = gr.Slider(minimum=1, maximum=10, value=1, step=1, label="Min Connection Strength")
+                fullscreen_btn = gr.Button("↗️ Open Full Screen", variant="secondary")
             
         graph_plot = gr.HTML(label="Knowledge Graph", elem_id="graph-plot-container")
         
@@ -86,4 +87,18 @@ def create_visualization_tab(ui):
             ui.handle_graph_generation,
             inputs=[max_nodes, min_weight, viz_mode, bg_color],
             outputs=[graph_plot]
+        )
+        
+        # Full Screen Handler - using State to avoid preprocessing issues
+        graph_path_state = gr.State(value=None)
+        
+        fullscreen_btn.click(
+            ui.get_graph_html_path,
+            inputs=[max_nodes, min_weight, viz_mode],
+            outputs=[graph_path_state]
+        ).then(
+            None,
+            inputs=[graph_path_state],
+            outputs=None,
+            js="(path) => { if (path) { window.open('/file=' + path, '_blank'); } }"
         )

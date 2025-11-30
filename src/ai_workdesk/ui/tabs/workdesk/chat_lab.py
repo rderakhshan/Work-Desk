@@ -116,6 +116,10 @@ def create_chat_lab_tab(ui):
                         )
                     with gr.Column(scale=1):
                         download_btn = gr.Button("📥 Download Chat", variant="secondary", elem_classes=["secondary-btn"])
+                    with gr.Column(scale=1):
+                        obsidian_btn = gr.Button("💾 Save to Obsidian", variant="secondary", elem_classes=["secondary-btn"])
+                
+                chat_obsidian_status = gr.Textbox(label="Obsidian Export Status", interactive=False, visible=False)
 
             with gr.Column(scale=2, elem_classes=["glass-panel"]):
                 provider_dropdown = gr.Dropdown(
@@ -225,7 +229,17 @@ def create_chat_lab_tab(ui):
             js="() => { alert('Chat history exported to Downloads folder!'); }"
         )
         
-        # 5. Update Models based on Provider
+        # 5. Save to Obsidian
+        obsidian_btn.click(
+            ui.handle_chat_obsidian_export,
+            inputs=[chatbot],
+            outputs=[chat_obsidian_status]
+        ).then(
+            lambda: gr.update(visible=True),
+            outputs=[chat_obsidian_status]
+        )
+        
+        # 6. Update Models based on Provider
         provider_dropdown.change(
             ui.update_models,
             inputs=[provider_dropdown],

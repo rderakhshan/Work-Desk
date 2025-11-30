@@ -108,8 +108,10 @@ def create_ingestion_tab(ui):
                 
                 with gr.Row():
                     yt_summarize_btn = gr.Button("📝 Summarize Video", variant="secondary")
+                    yt_obsidian_btn = gr.Button("💾 Save to Obsidian", variant="secondary")
                 
                 yt_summary_output = gr.Markdown(label="Video Summary")
+                yt_obsidian_status = gr.Textbox(label="Obsidian Export Status", interactive=False, visible=False)
                 
                 # Hidden state to store video text for chat
                 yt_video_text = gr.State()
@@ -122,6 +124,15 @@ def create_ingestion_tab(ui):
                     ui.handle_youtube_summarization,
                     inputs=[youtube_url],
                     outputs=[yt_summary_output, yt_video_text, yt_chatbot]
+                )
+                
+                yt_obsidian_btn.click(
+                    ui.handle_obsidian_export,
+                    inputs=[youtube_url, yt_summary_output, yt_video_text, yt_chatbot],
+                    outputs=[yt_obsidian_status]
+                ).then(
+                    lambda: gr.update(visible=True),
+                    outputs=[yt_obsidian_status]
                 )
                 
                 yt_msg.submit(
