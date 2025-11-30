@@ -317,7 +317,7 @@ def create_about_tab(settings):
         gr.Markdown("# 📚 AI Workdesk Documentation")
         
         # Documentation navigation tabs
-        with gr.Tabs():
+        with gr.Tabs(elem_classes=["doc-tabs"]):
             # Tab 1: Overview
             with gr.TabItem("📖 Overview"):
                 toc, content = doc_renderer.render("index.md")

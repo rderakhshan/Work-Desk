@@ -493,11 +493,38 @@ h1, h2 {
 }
 
 /* Remove any remaining gradients or animations */
-* {
     animation: none !important;
     transition-duration: 0.15s !important;
 }
-"""
+
+/* Smooth Scrolling */
+html {
+    scroll-behavior: smooth !important;
+}
+
+/* Sticky Documentation Tabs */
+.doc-tabs {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 900 !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding-top: 10px !important;
+}
+
+/* Adjust sidebar top position to account for sticky tabs */
+.doc-sidebar {
+    position: sticky !important;
+    top: 80px !important;
+    max-height: calc(100vh - 100px) !important;
+    overflow-y: auto !important;
+}
+
+/* Ensure main content handles sticky elements correctly */
+.doc-content {
+    scroll-margin-top: 100px !important;
+}
 """ + DASHBOARD_CSS
 
 def create_sidebar_content():
@@ -506,7 +533,7 @@ def create_sidebar_content():
     gr.HTML(
         """
         <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
-            ☰
+            &#9776;
         </button>
         <script>
         function toggleSidebar() {
@@ -514,7 +541,7 @@ def create_sidebar_content():
             const sidebarColumns = document.querySelectorAll('.sidebar-container');
             let sidebar = null;
             
-            // If custom class doesn't work, find by structure (first column in row)
+            // If custom class does not work, find by structure (first column in row)
             if (sidebarColumns.length === 0) {
                 const mainRow = document.querySelector('.gradio-container .block.gradio-row');
                 if (mainRow) {
