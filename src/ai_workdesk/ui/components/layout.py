@@ -281,6 +281,172 @@ h1, h2 {
     font-size: 0.8em;
     opacity: 0.7;
 }
+
+/* Documentation Styles */
+.doc-sidebar {
+    position: sticky;
+    top: 20px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.doc-toc-container {
+    background: rgba(99, 102, 241, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.doc-toc a {
+    color: #6366f1 !important;
+    text-decoration: none !important;
+    display: block;
+    padding: 8px 12px;
+    border-left: 2px solid transparent;
+    transition: all 0.2s ease;
+    font-size: 0.95em;
+}
+
+.doc-toc a:hover {
+    border-left-color: #6366f1;
+    background: rgba(99, 102, 241, 0.1);
+    padding-left: 16px;
+}
+
+.doc-content h1 {
+    border-bottom: 3px solid #6366f1;
+    padding-bottom: 12px;
+    margin-top: 0;
+    color: #1e293b !important;
+}
+
+.doc-content h2 {
+    margin-top: 40px;
+    margin-bottom: 16px;
+    color: #4f46e5 !important;
+    font-weight: 700;
+}
+
+.doc-content h3 {
+    margin-top: 24px;
+    color: #6366f1 !important;
+    font-weight: 600;
+}
+
+.doc-content code {
+    background: #f1f5f9 !important;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+    font-family: 'Courier New', monospace !important;
+    color: #e11d48 !important;
+    font-size: 0.9em !important;
+}
+
+.doc-content pre {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+    padding: 20px !important;
+    border-radius: 8px !important;
+    overflow-x: auto !important;
+    margin: 16px 0 !important;
+    position: relative !important;
+}
+
+.doc-content pre code {
+    background: transparent !important;
+    color: #e2e8f0 !important;
+    padding: 0 !important;
+}
+
+.code-block-wrapper {
+    position: relative;
+    margin: 16px 0;
+}
+
+.copy-code-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #6366f1 !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 14px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 0.85em !important;
+    transition: all 0.2s ease !important;
+    z-index: 10;
+}
+
+.copy-code-btn:hover {
+    background: #4f46e5 !important;
+    transform: scale(1.05);
+}
+
+.doc-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.doc-content th {
+    background: #6366f1;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.doc-content td {
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.doc-content tr:last-child td {
+    border-bottom: none;
+}
+
+.doc-content tr:hover {
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.doc-content ul, .doc-content ol {
+    margin: 16px 0;
+    padding-left: 24px;
+}
+
+.doc-content li {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.doc-content blockquote {
+    border-left: 4px solid #6366f1;
+    padding-left: 16px;
+    margin: 16px 0;
+    color: #64748b;
+    font-style: italic;
+}
+
+.doc-content a {
+    color: #6366f1 !important;
+    text-decoration: none !important;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.doc-content a:hover {
+    border-bottom-color: #6366f1;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    margin: 20px 0;
+}
 """ + DASHBOARD_CSS
 
 def create_sidebar_content():
