@@ -459,26 +459,54 @@ def create_sidebar_content():
         </button>
         <script>
         function toggleSidebar() {
-            const sidebar = document.querySelector('.sidebar-container');
+            // Find the sidebar by looking for the parent column with sidebar classes
+            const sidebarColumns = document.querySelectorAll('.sidebar-container');
+            let sidebar = null;
+            
+            // If custom class doesn't work, find by structure (first column in row)
+            if (sidebarColumns.length === 0) {
+                const mainRow = document.querySelector('.gradio-container .block.gradio-row');
+                if (mainRow) {
+                    sidebar = mainRow.querySelector('.block.gradio-column');
+                }
+            } else {
+                sidebar = sidebarColumns[0];
+            }
+            
             const toggle = document.querySelector('.sidebar-toggle');
+            
             if (sidebar) {
                 sidebar.classList.toggle('collapsed');
                 const isCollapsed = sidebar.classList.contains('collapsed');
                 localStorage.setItem('sidebarCollapsed', isCollapsed);
-                toggle.style.left = isCollapsed ? '60px' : '200px';
+                
+                // Adjust toggle button position
+                if (toggle) {
+                    toggle.style.left = isCollapsed ? '60px' : '200px';
+                }
+                
+                // Adjust sidebar width
+                if (isCollapsed) {
+                    sidebar.style.minWidth = '60px';
+                    sidebar.style.maxWidth = '60px';
+                    sidebar.style.flex = '0 0 60px';
+                } else {
+                    sidebar.style.minWidth = '200px';
+                    sidebar.style.maxWidth = '';
+                    sidebar.style.flex = '';
+                }
+            } else {
+                console.error('Sidebar not found');
             }
         }
         
         // Restore sidebar state on load
-        window.addEventListener('load', function() {
+        setTimeout(function() {
             const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            const sidebar = document.querySelector('.sidebar-container');
-            const toggle = document.querySelector('.sidebar-toggle');
-            if (isCollapsed && sidebar) {
-                sidebar.classList.add('collapsed');
-                if (toggle) toggle.style.left = '60px';
+            if (isCollapsed) {
+                toggleSidebar();
             }
-        });
+        }, 500); // Wait for Gradio to fully render
         </script>
         """
     )
