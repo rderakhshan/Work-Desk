@@ -282,7 +282,7 @@ h1, h2 {
     opacity: 0.7;
 }
 
-/* Documentation Styles */
+/* Documentation Styles - Professional Enterprise Design */
 .doc-sidebar {
     position: sticky;
     top: 20px;
@@ -291,119 +291,149 @@ h1, h2 {
 }
 
 .doc-toc-container {
-    background: rgba(99, 102, 241, 0.05);
-    border-radius: 12px;
+    background: #f9fafb;
+    border-radius: 6px;
     padding: 20px;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    border: 1px solid #e5e7eb;
 }
 
 .doc-toc a {
-    color: #6366f1 !important;
+    color: #374151 !important;
     text-decoration: none !important;
     display: block;
     padding: 8px 12px;
     border-left: 2px solid transparent;
-    transition: all 0.2s ease;
-    font-size: 0.95em;
+    transition: all 0.15s ease;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .doc-toc a:hover {
-    border-left-color: #6366f1;
-    background: rgba(99, 102, 241, 0.1);
-    padding-left: 16px;
+    border-left-color: #2563eb;
+    background: #f3f4f6;
+    color: #111827 !important;
 }
 
 .doc-content h1 {
-    border-bottom: 3px solid #6366f1;
+    border-bottom: 2px solid #e5e7eb;
     padding-bottom: 12px;
     margin-top: 0;
-    color: #1e293b !important;
+    margin-bottom: 24px;
+    color: #111827 !important;
+    font-weight: 600;
+    font-size: 32px;
 }
 
 .doc-content h2 {
-    margin-top: 40px;
+    margin-top: 48px;
     margin-bottom: 16px;
-    color: #4f46e5 !important;
-    font-weight: 700;
+    color: #111827 !important;
+    font-weight: 600;
+    font-size: 24px;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 8px;
 }
 
 .doc-content h3 {
-    margin-top: 24px;
-    color: #6366f1 !important;
+    margin-top: 32px;
+    margin-bottom: 12px;
+    color: #374151 !important;
     font-weight: 600;
+    font-size: 18px;
+}
+
+.doc-content h4 {
+    margin-top: 24px;
+    margin-bottom: 8px;
+    color: #4b5563 !important;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.doc-content p {
+    line-height: 1.7;
+    color: #374151 !important;
+    margin: 16px 0;
 }
 
 .doc-content code {
-    background: #f1f5f9 !important;
-    padding: 3px 8px !important;
-    border-radius: 4px !important;
-    font-family: 'Courier New', monospace !important;
-    color: #e11d48 !important;
+    background: #f3f4f6 !important;
+    padding: 2px 6px !important;
+    border-radius: 3px !important;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    color: #dc2626 !important;
     font-size: 0.9em !important;
+    border: 1px solid #e5e7eb !important;
 }
 
 .doc-content pre {
     background: #1e293b !important;
     color: #e2e8f0 !important;
     padding: 20px !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     overflow-x: auto !important;
-    margin: 16px 0 !important;
+    margin: 20px 0 !important;
     position: relative !important;
+    border: 1px solid #334155 !important;
 }
 
 .doc-content pre code {
     background: transparent !important;
     color: #e2e8f0 !important;
     padding: 0 !important;
+    border: none !important;
 }
 
 .code-block-wrapper {
     position: relative;
-    margin: 16px 0;
+    margin: 20px 0;
 }
 
 .copy-code-btn {
     position: absolute;
     top: 12px;
     right: 12px;
-    background: #6366f1 !important;
+    background: #2563eb !important;
     color: white !important;
     border: none !important;
-    padding: 6px 14px !important;
-    border-radius: 6px !important;
+    padding: 6px 12px !important;
+    border-radius: 4px !important;
     cursor: pointer !important;
-    font-size: 0.85em !important;
-    transition: all 0.2s ease !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    transition: background 0.15s ease !important;
     z-index: 10;
 }
 
 .copy-code-btn:hover {
-    background: #4f46e5 !important;
-    transform: scale(1.05);
+    background: #1d4ed8 !important;
 }
 
 .doc-content table {
     width: 100%;
     border-collapse: collapse;
-    margin: 20px 0;
+    margin: 24px 0;
     background: white;
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e5e7eb;
 }
 
 .doc-content th {
-    background: #6366f1;
-    color: white;
-    padding: 12px;
+    background: #f9fafb;
+    color: #111827;
+    padding: 12px 16px;
     text-align: left;
     font-weight: 600;
+    font-size: 14px;
+    border-bottom: 2px solid #e5e7eb;
 }
 
 .doc-content td {
-    padding: 12px;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+    font-size: 14px;
 }
 
 .doc-content tr:last-child td {
@@ -411,42 +441,63 @@ h1, h2 {
 }
 
 .doc-content tr:hover {
-    background: rgba(99, 102, 241, 0.05);
+    background: #f9fafb;
 }
 
 .doc-content ul, .doc-content ol {
     margin: 16px 0;
-    padding-left: 24px;
+    padding-left: 28px;
 }
 
 .doc-content li {
     margin: 8px 0;
-    line-height: 1.6;
+    line-height: 1.7;
+    color: #374151;
 }
 
 .doc-content blockquote {
-    border-left: 4px solid #6366f1;
-    padding-left: 16px;
-    margin: 16px 0;
-    color: #64748b;
-    font-style: italic;
+    border-left: 3px solid #2563eb;
+    padding-left: 20px;
+    margin: 20px 0;
+    color: #4b5563;
+    font-style: normal;
+    background: #f9fafb;
+    padding: 16px 20px;
+    border-radius: 4px;
 }
 
 .doc-content a {
-    color: #6366f1 !important;
+    color: #2563eb !important;
     text-decoration: none !important;
     border-bottom: 1px solid transparent;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.15s ease;
 }
 
 .doc-content a:hover {
-    border-bottom-color: #6366f1;
+    border-bottom-color: #2563eb;
+}
+
+.doc-content strong {
+    font-weight: 600;
+    color: #111827;
+}
+
+.doc-content em {
+    font-style: italic;
+    color: #4b5563;
 }
 
 .table-wrapper {
     overflow-x: auto;
-    margin: 20px 0;
+    margin: 24px 0;
 }
+
+/* Remove any remaining gradients or animations */
+* {
+    animation: none !important;
+    transition-duration: 0.15s !important;
+}
+"""
 """ + DASHBOARD_CSS
 
 def create_sidebar_content():
