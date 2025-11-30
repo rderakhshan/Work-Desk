@@ -969,6 +969,10 @@ class AIWorkdeskUI:
 ui = AIWorkdeskUI()
 demo = ui.create_interface()
 
+# Explicitly set auth details on the Blocks object for Gradio CLI
+demo.auth = ui.authenticate
+demo.auth_message = "🔐 Please login to AI Workdesk"
+
 def main() -> None:
     """Main entry point."""
     print("\n" + "=" * 60)

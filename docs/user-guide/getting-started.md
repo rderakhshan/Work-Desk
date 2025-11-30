@@ -11,10 +11,19 @@ Get up and running with AI Workdesk in minutes.
 
 ## Installation
 
-### 1. Navigate to Project Directory
+### 1. Clone and Navigate to Project
+
+First, clone the repository:
 
 ```bash
-cd "C:\Users\Riemann\Documents\AI Engineering LAB\RAG\RAG LAB Original"
+git clone https://github.com/rderakhshan/Work-Desk.git
+cd Work-Desk
+```
+
+Or if you already have the project, navigate to it:
+
+```bash
+cd path/to/Work-Desk
 ```
 
 ### 2. Sync Dependencies
