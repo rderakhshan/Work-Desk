@@ -338,7 +338,7 @@ def create_sidebar_content():
     
     home_btn = gr.Button("🏠 Home", variant="primary", elem_classes=["primary-btn"])
     workdesk_btn = gr.Button("🛠️ Work Desk", variant="secondary", elem_classes=["secondary-btn"])
-    autogen_btn = gr.Button("🤖 AutoGen Studio", variant="secondary", elem_classes=["secondary-btn", "external-link-btn"])
+    autogen_btn = gr.Button("🤖 Agentic LAB", variant="secondary", elem_classes=["secondary-btn", "external-link-btn"])
     about_btn = gr.Button("ℹ️ About", variant="secondary", elem_classes=["secondary-btn"])
     
     gr.Markdown("---")
