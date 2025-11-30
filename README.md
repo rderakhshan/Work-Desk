@@ -13,6 +13,7 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 🎥 **YouTube Integration**: Ingest video transcripts with timestamp citations
 - 📊 **Knowledge Graph**: Visualize entity relationships in your documents
 - 🔍 **Advanced RAG**: Multiple retrieval strategies (Naive, HyDE, Fusion, Hybrid, Graph+Vector)
+- 📚 **Comprehensive Documentation**: Auto-generated TOC with interactive navigation in About page
 
 ## 📸 UI Gallery
 
@@ -65,6 +66,22 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - ✅ **UI Stability**: Fixed Gradio app corruption and restored missing methods
 - ✅ **Graph Rendering**: Resolved black area issues in dense graphs
 - ✅ **System Reliability**: Improved error handling for ingestion pipelines
+
+## 🆕 Recent Updates (November 30, 2024)
+
+### 📚 Comprehensive Documentation System
+- ✅ **Auto-Generated Table of Contents**: Python-Markdown powered TOC with automatic header extraction
+- ✅ **Structured Documentation**: Complete guides for Getting Started, Features, Configuration, and more
+- ✅ **Interactive Navigation**: Clickable TOC sidebar with smooth scrolling to sections
+- ✅ **Professional Styling**: Syntax-highlighted code blocks with copy buttons
+- ✅ **Tabbed Interface**: Organized documentation in the About page with multiple tabs
+- ✅ **Zero Maintenance**: TOC automatically updates when documentation changes
+
+### 🎨 UI Enhancements
+- ✅ **Collapsible Sidebar**: Toggle button (☰) to expand/collapse navigation
+- ✅ **Agentic LAB**: Renamed "AutoGen Studio" to "Agentic LAB" with external link indicator (↗)
+- ✅ **Persistent State**: Sidebar collapse state saved in localStorage
+- ✅ **Improved Navigation**: AutoGen Studio moved to main sidebar (opens in new tab)
 
 ## 🆕 Recent Updates (November 24, 2024)
 
