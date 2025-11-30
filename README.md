@@ -14,6 +14,33 @@ A professional Python workdesk for developing and utilizing various AI tools. Bu
 - 📊 **Knowledge Graph**: Visualize entity relationships in your documents
 - 🔍 **Advanced RAG**: Multiple retrieval strategies (Naive, HyDE, Fusion, Hybrid, Graph+Vector)
 
+## 📸 UI Gallery
+
+<div align="center">
+  <img src="docs/images/dashboard_ui.png" alt="Smart Dashboard" width="800"/>
+  <p><em>Smart Dashboard with Glassmorphism Design</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/chat_lab_ui.png" alt="Chat LAB" width="800"/>
+  <p><em>Chat LAB for Direct AI Interaction</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/rag_lab_ui.png" alt="RAG LAB" width="800"/>
+  <p><em>RAG LAB with Advanced Retrieval Settings</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/youtube_ingestion_ui.png" alt="YouTube Ingestion" width="800"/>
+  <p><em>YouTube Video Ingestion & Summarization</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/visualization_ui.png" alt="Visualization" width="800"/>
+  <p><em>Knowledge Graph & Embedding Visualization</em></p>
+</div>
+
 ## 🆕 Recent Updates (November 29, 2024)
 
 ### 🚀 Performance & Visualization

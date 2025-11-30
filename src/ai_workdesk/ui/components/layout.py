@@ -80,8 +80,8 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     border-radius: 24px !important;
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37) !important;
-    height: 70vh !important; /* Fixed viewport height percentage for responsiveness */
-    min-height: 500px !important;
+    height: 17.5vh !important; /* Reduced to 25% of previous 70vh per user request */
+    min-height: 150px !important;
     overflow-y: auto !important;
     flex-grow: 1 !important;
 }
