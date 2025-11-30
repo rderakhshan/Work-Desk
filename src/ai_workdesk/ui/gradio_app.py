@@ -417,10 +417,10 @@ class AIWorkdeskUI:
                 summary=summary,
                 transcript=video_text if video_text else None,
                 chat_history=chat_text,
-                metadata={{
+                metadata={
                     'duration': metadata.get('duration', 0),
                     'view_count': metadata.get('view_count', 0)
-                }}
+                }
             )
             
             return f"✅ Successfully exported to Obsidian!\n📝 Note saved at: {note_path}"
@@ -460,6 +460,53 @@ class AIWorkdeskUI:
             # Export to Obsidian
             note_path = self.obsidian_exporter.export_chat_note(
                 title=first_user_msg,
+                chat_history=chat_text
+            )
+            
+            return f"✅ Successfully exported to Obsidian!\n📝 Note saved at: {note_path}"
+            
+        except Exception as e:
+            logger.error(f"Obsidian export error: {e}")
+            return f"❌ Export failed: {str(e)}"
+
+    def handle_rag_obsidian_export(self, chat_history):
+        """Export RAG chat history to Obsidian vault."""
+        if not self.obsidian_exporter:
+            return "❌ Obsidian exporter not configured. Please set OBSIDIAN_VAULT_PATH in your .env file."
+        
+        if not chat_history:
+            return "⚠️ Chat history is empty."
+        
+        try:
+            # Format chat history
+            # For RAG, we want to capture the last Q&A pair as the main content, 
+            # but also save the full history.
+            
+            chat_lines = []
+            last_query = "RAG Session"
+            last_answer = ""
+            
+            for msg in chat_history:
+                role = msg.get("role", "").upper()
+                content = msg.get("content", "")
+                
+                if role == "USER":
+                    chat_lines.append(f"**Q:** {content}")
+                    last_query = content
+                elif role == "ASSISTANT":
+                    chat_lines.append(f"**A:** {content}\n")
+                    last_answer = content
+            
+            chat_text = "\n".join(chat_lines)
+            
+            # Truncate title
+            title = last_query[:50] + "..." if len(last_query) > 50 else last_query
+            
+            # Export to Obsidian
+            note_path = self.obsidian_exporter.export_rag_note(
+                title=title,
+                query=last_query,
+                answer=last_answer,
                 chat_history=chat_text
             )
             

@@ -242,3 +242,78 @@ class ObsidianExporter:
         except Exception as e:
             logger.error(f"Error exporting Chat note: {e}")
             raise
+
+    def export_rag_note(
+        self,
+        title: str,
+        query: str,
+        answer: str,
+        sources: list = None,
+        chat_history: str = None
+    ) -> str:
+        """
+        Export a RAG session as an Obsidian note.
+        
+        Args:
+            title: Note title
+            query: The user's query
+            answer: The AI's answer
+            sources: List of source documents
+            chat_history: Optional full chat history
+            
+        Returns:
+            Path to the created note
+        """
+        try:
+            # Create filename
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            safe_title = self._sanitize_filename(title)
+            filename = f"{safe_title} - {date_str}.md"
+            
+            # Save in "RAG" subfolder
+            rag_folder = self.workdesk_folder.parent / "RAG"
+            rag_folder.mkdir(parents=True, exist_ok=True)
+            note_path = rag_folder / filename
+            
+            # Build frontmatter
+            frontmatter_lines = [
+                "---",
+                f"title: \"{title}\"",
+                f"date: {date_str}",
+                "type: rag-session",
+                "tags:",
+                "  - ai-rag",
+                "  - ai-workdesk"
+            ]
+            frontmatter_lines.append("---")
+            frontmatter = "\n".join(frontmatter_lines)
+            
+            # Build content
+            content_parts = [f"# {title}\n"]
+            
+            content_parts.append("## ❓ Query")
+            content_parts.append(f"{query}\n")
+            
+            content_parts.append("## 💡 Answer")
+            content_parts.append(f"{answer}\n")
+            
+            if sources:
+                content_parts.append("## 📚 Sources")
+                for source in sources:
+                    content_parts.append(f"- {source}")
+                content_parts.append("")
+            
+            if chat_history:
+                content_parts.append("## 💬 Full Chat History")
+                content_parts.append(f"{chat_history}\n")
+            
+            # Write to file
+            full_content = f"{frontmatter}\n\n" + "\n".join(content_parts)
+            note_path.write_text(full_content, encoding='utf-8')
+            
+            logger.info(f"Exported RAG note to: {note_path}")
+            return str(note_path)
+            
+        except Exception as e:
+            logger.error(f"Error exporting RAG note: {e}")
+            raise

@@ -108,7 +108,7 @@ def create_ingestion_tab(ui):
                 
                 with gr.Row():
                     yt_summarize_btn = gr.Button("📝 Summarize Video", variant="secondary")
-                    yt_obsidian_btn = gr.Button("💾 Save to Obsidian", variant="secondary")
+                    yt_obsidian_btn = gr.Button("💾 Save Summary & Chat to Obsidian", variant="secondary")
                 
                 yt_summary_output = gr.Markdown(label="Video Summary")
                 yt_obsidian_status = gr.Textbox(label="Obsidian Export Status", interactive=False, visible=False)
@@ -119,6 +119,9 @@ def create_ingestion_tab(ui):
                 gr.Markdown("#### 💬 Chat with Video")
                 yt_chatbot = gr.Chatbot(label="Video Chat", height=400, type="messages")
                 yt_msg = gr.Textbox(label="Ask a question about the video", placeholder="What is the main takeaway?")
+                
+                with gr.Row():
+                    yt_save_chat_btn = gr.Button("💾 Save Chat to Obsidian", variant="secondary", size="sm")
                 
                 yt_summarize_btn.click(
                     ui.handle_youtube_summarization,
@@ -139,6 +142,16 @@ def create_ingestion_tab(ui):
                     ui.handle_youtube_chat,
                     inputs=[yt_msg, yt_chatbot, yt_video_text],
                     outputs=[yt_msg, yt_chatbot]
+                )
+                
+                # Wire up the second save button (same handler)
+                yt_save_chat_btn.click(
+                    ui.handle_obsidian_export,
+                    inputs=[youtube_url, yt_summary_output, yt_video_text, yt_chatbot],
+                    outputs=[yt_obsidian_status]
+                ).then(
+                    lambda: gr.update(visible=True),
+                    outputs=[yt_obsidian_status]
                 )
             
             # Audio Tab
