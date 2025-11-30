@@ -32,5 +32,6 @@ def create_workdesk_tab(ui):
             create_rag_lab_tab(ui)
             
             # TAB 3: Chat LAB
+            create_chat_lab_tab(ui)
             
     return workdesk_page
